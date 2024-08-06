@@ -8,7 +8,8 @@ import (
 	"math"
 )
 
-//const drawReferenceLines = true
+// const drawReferenceLines = true
+const LeftToolbarMinimumWidth = 200
 
 func MainUiLoop() {
 	window := g.SingleWindow()
@@ -18,23 +19,28 @@ func MainUiLoop() {
 	//fmt.Printf("Window position = %g,%g\n", windowX, windowY)
 
 	w32, h32 := window.CurrentSize()
-	width := float64(w32)
-	height := float64(h32)
+	windowWidth := float64(w32)
+	windowHeight := float64(h32)
+	leftToolbarWidth := int(math.Max(windowWidth-windowHeight, float64(LeftToolbarMinimumWidth)))
+	dartboardWidth := int(windowWidth) - leftToolbarWidth
 	//fmt.Printf("Window size: %dx%d\n", int(width), int(height))
 
-	squareDimension := math.Min(width, height)
-	xPadding := int(math.Round((width - squareDimension) / 2))
-	yPadding := int(math.Round((height - squareDimension) / 2))
+	// There is a left toolbar with buttons and messages, and the dartboard occupies a square
+	// in the remaining window to the right of this
+
+	squareDimension := math.Min(float64(dartboardWidth), windowHeight)
+	//xPadding := leftToolbarWidth
+	//yPadding := 0 // dartboard is at top of window - no padding above it
 	//fmt.Printf("Window position = (%g,%g), size = (%g,%g). Square image is %g x %g,  x padding %d, y padding %d\n",
 	//	windowX, windowY,
 	//	width, height,
 	//	squareDimension, squareDimension,
 	//	xPadding, yPadding)
-	imageMin := image.Pt(int(windowX)+xPadding, int(windowY)+yPadding)
-	imageMax := image.Pt(imageMin.X+int(squareDimension), imageMin.Y+int(squareDimension))
+	dartboardImageMin := image.Pt(int(windowX)+leftToolbarWidth, int(windowY))
+	dartboardImageMax := image.Pt(dartboardImageMin.X+int(squareDimension), dartboardImageMin.Y+int(squareDimension))
 	//fmt.Printf("image min %d, max %d\n", imageMin, imageMax)
 
-	SetDartboardDimensions(window, squareDimension, imageMin, imageMax)
+	SetDartboardDimensions(window, squareDimension, dartboardImageMin, dartboardImageMax)
 	SetDartboardClickCallback(dartboardClickCallback)
 
 	window.Layout(

@@ -3,6 +3,7 @@ package boardgeo
 import (
 	"fmt"
 	g "github.com/AllenDang/giu"
+	"image"
 	"math"
 	"strconv"
 )
@@ -152,27 +153,18 @@ func determineMultiplier(radius float64) int {
 	return multiplierList[foundMultiplierIndex]
 }
 
-func CalcMousePolarPosition(window *g.WindowWidget) BoardPosition {
-	wx32, wy32 := window.CurrentPosition()
-	windowX := float64(wx32)
-	windowY := float64(wy32)
-
-	w32, h32 := window.CurrentSize()
-	width := float64(w32)
-	height := float64(h32)
-
-	squareDimension := math.Min(width, height)
-	xPadding := int(math.Round((width - squareDimension) / 2))
-	yPadding := int(math.Round((height - squareDimension) / 2))
-	//fmt.Printf("Window size (%d x %d), Padding (%d x %d)\n", int(width), int(height), xPadding, yPadding)
+// func CalcMousePolarPosition(window *g.WindowWidget) BoardPosition {
+func CalcMousePolarPosition(squareDimension float64, imageMin image.Point, _ image.Point) BoardPosition {
 	mp := g.GetMousePos()
-	xMouseInside := mp.X - int(windowX) - xPadding
-	yMouseInside := mp.Y - int(windowY) - yPadding
-	//fmt.Printf("Window Position = (%g,%g), Absolute Mouse Position = (%d,%d), Relative Mouse = (%d,%d)\n",
-	//	windowX, windowY, mp.X, mp.Y, xMouseInside, yMouseInside)
+	//fmt.Printf("CalcMousePolarPosition(%g,%v,%v) mp %v\n", squareDimension, imageMin, imageMax, mp)
+	xMouseInside := mp.X - imageMin.X
+	yMouseInside := mp.Y - imageMin.Y
+	//fmt.Printf("Absolute Mouse Position = (%d,%d), Relative Mouse = (%d,%d)\n",
+	//	mp.X, mp.Y, xMouseInside, yMouseInside)
 
 	xMouseZeroCentered := xMouseInside - int(math.Round(squareDimension/2))
 	yMouseZeroCentered := -(yMouseInside - int(math.Round(squareDimension/2)))
+	//fmt.Printf("Mouse centred = (%d,%d)\n", xMouseZeroCentered, yMouseZeroCentered)
 
 	xFractionBoard := float64(xMouseZeroCentered) / (squareDimension / 2)
 	yFractionBoard := float64(yMouseZeroCentered) / (squareDimension / 2)

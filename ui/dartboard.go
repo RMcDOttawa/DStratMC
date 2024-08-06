@@ -7,7 +7,7 @@ import (
 	"image/color"
 )
 
-const drawReferenceLines = true
+const drawReferenceLines = false
 
 var DartboardInfo struct {
 	window          *g.WindowWidget
@@ -93,7 +93,8 @@ func dartboardClicked() {
 	if DartboardInfo.clickCallback == nil {
 		//fmt.Println("  No callback function")
 	} else {
-		position := boardgeo.CalcMousePolarPosition(DartboardInfo.window)
+		position := boardgeo.CalcMousePolarPosition(DartboardInfo.squareDimension,
+			DartboardInfo.imageMin, DartboardInfo.imageMax)
 		DartboardInfo.clickCallback(position)
 	}
 }
