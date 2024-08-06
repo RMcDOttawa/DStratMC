@@ -18,7 +18,7 @@ const outsideDoubleDiameter = 340.0
 const scoringAreaDiameter = outsideDoubleDiameter
 
 // Those same quantities as radii
-const displayedBoardRadius = displayedBoardDiameter / 2.0
+// const displayedBoardRadius = displayedBoardDiameter / 2.0
 const innerBullRadius = innerBullDiameter / 2.0
 const outerBullRadius = outerBullDiameter / 2.0
 const insideTrebleRadius = insideTrebleDiameter / 2.0
@@ -67,7 +67,7 @@ const scoringAreaFraction = float64(scoringAreaDiameter) / float64(displayedBoar
 
 // DescribeBoardPoint describes a point on the board by the area and the score
 func DescribeBoardPoint(point BoardPosition) (int, int, string) {
-	fmt.Printf("DescribeBoardPoint(%#v)\n", point)
+	//fmt.Printf("DescribeBoardPoint(%#v)\n", point)
 	if point.Radius > 1 {
 		return BoardArea_Out, 0, BoardAreaDescription[BoardArea_Out]
 	}

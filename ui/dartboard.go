@@ -1,6 +1,7 @@
 package ui
 
 import (
+	boardgeo "DStratMC/board-geometry"
 	g "github.com/AllenDang/giu"
 	"image"
 	"image/color"
@@ -9,18 +10,26 @@ import (
 const drawReferenceLines = true
 
 var DartboardInfo struct {
+	window          *g.WindowWidget
 	Texture         *g.Texture
 	squareDimension float64
 	imageMin        image.Point
 	imageMax        image.Point
-	//clicked         func(radius float64, angle float64)
+	clickCallback   func(position boardgeo.BoardPosition)
 	//sema            sync.Mutex
 }
 
-func SetDartboardDimensions(squareDimension float64, imageMin image.Point, imageMax image.Point) {
+func SetDartboardDimensions(windowWidget *g.WindowWidget,
+	squareDimension float64,
+	imageMin image.Point, imageMax image.Point) {
+	DartboardInfo.window = windowWidget
 	DartboardInfo.squareDimension = squareDimension
 	DartboardInfo.imageMin = imageMin
 	DartboardInfo.imageMax = imageMax
+}
+
+func SetDartboardClickCallback(callback func(position boardgeo.BoardPosition)) {
+	DartboardInfo.clickCallback = callback
 }
 
 func DartboardCustomFunc() {
@@ -45,6 +54,15 @@ func DartboardCustomFunc() {
 	//stubColour := color.RGBA{200, 0, 0, 255}
 	//canvas.AddCircleFilled(stubCentre, stubRadius, stubColour)
 
+	//	Position an invisible button on top of this image to detect clicks
+	//	Remember and then restore drawing cursor so image comes out on top of this
+	savedCsp := g.GetCursorScreenPos()
+	g.SetCursorScreenPos(d.imageMin)
+	g.InvisibleButton().Size(float32(d.squareDimension), float32(d.squareDimension)).
+		OnClick(dartboardClicked).
+		Build()
+	g.SetCursorScreenPos(savedCsp)
+
 	// Display dartboard image
 	canvas.AddImage(d.Texture, d.imageMin, d.imageMax)
 
@@ -68,12 +86,14 @@ func DartboardCustomFunc() {
 		horizontalTo := image.Pt(xCentre+int(d.squareDimension/2), yCentre)
 		canvas.AddLine(horizontalFrom, horizontalTo, crossHairColour, 1)
 	}
-
-	//	Position an invisible button on top of this image so we can detect clicks
-
 }
 
-//func (d *DartboardWidget) Build() {
-//	d.sema.Lock()
-//	defer d.sema.Unlock()
-//}
+func dartboardClicked() {
+	//fmt.Println("dartboard clicked")
+	if DartboardInfo.clickCallback == nil {
+		//fmt.Println("  No callback function")
+	} else {
+		position := boardgeo.CalcMousePolarPosition(DartboardInfo.window)
+		DartboardInfo.clickCallback(position)
+	}
+}

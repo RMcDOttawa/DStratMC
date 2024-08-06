@@ -1,6 +1,8 @@
 package ui
 
 import (
+	boardgeo "DStratMC/board-geometry"
+	"fmt"
 	g "github.com/AllenDang/giu"
 	"image"
 	"math"
@@ -32,12 +34,22 @@ func MainUiLoop() {
 	imageMax := image.Pt(imageMin.X+int(squareDimension), imageMin.Y+int(squareDimension))
 	//fmt.Printf("image min %d, max %d\n", imageMin, imageMax)
 
-	SetDartboardDimensions(squareDimension, imageMin, imageMax)
+	SetDartboardDimensions(window, squareDimension, imageMin, imageMax)
+	SetDartboardClickCallback(dartboardClickCallback)
 
 	window.Layout(
 		g.Custom(DartboardCustomFunc),
 	)
 
+}
+
+func dartboardClickCallback(position boardgeo.BoardPosition) {
+	//fmt.Printf("Dartboard clicked at radius %g, angle %g\n", position.Radius, position.Angle)
+	if position.Radius <= 1.0 {
+		//markHitPoint(polarRadius, thetaDegrees)
+		_, score, description := boardgeo.DescribeBoardPoint(position)
+		fmt.Printf("%s: %d points\n", description, score)
+	}
 }
 
 //func MainUiLoop() {
