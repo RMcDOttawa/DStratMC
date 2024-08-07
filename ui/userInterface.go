@@ -2,14 +2,32 @@ package ui
 
 import (
 	boardgeo "DStratMC/board-geometry"
+	"DStratMC/simulation"
 	"fmt"
 	g "github.com/AllenDang/giu"
 	"image"
 	"math"
 )
 
-// const drawReferenceLines = true
+const (
+	RadioExactScore = iota
+	RadioOneAvgScore
+	RadioGroupAvgScore
+)
+
+var radioValue int
+
 const LeftToolbarMinimumWidth = 200
+
+var accuracyModel simulation.AccuracyModel
+var DartboardTexture *g.Texture
+var dartboard Dartboard
+
+func UserInterfaceSetup(theAccuracyModel simulation.AccuracyModel) {
+	accuracyModel = theAccuracyModel
+	radioValue = RadioOneAvgScore
+	dartboard = NewDartboard(dartboardClickCallback)
+}
 
 func MainUiLoop() {
 	window := g.SingleWindow()
@@ -29,57 +47,56 @@ func MainUiLoop() {
 	// in the remaining window to the right of this
 
 	squareDimension := math.Min(float64(dartboardWidth), windowHeight)
-	//xPadding := leftToolbarWidth
-	//yPadding := 0 // dartboard is at top of window - no padding above it
-	//fmt.Printf("Window position = (%g,%g), size = (%g,%g). Square image is %g x %g,  x padding %d, y padding %d\n",
+	//fmt.Printf("Window position = (%g,%g), size = (%g,%g). Square image is %g x %g\n",
 	//	windowX, windowY,
-	//	width, height,
-	//	squareDimension, squareDimension,
-	//	xPadding, yPadding)
+	//	windowWidth, windowHeight,
+	//	squareDimension, squareDimension)
 	dartboardImageMin := image.Pt(int(windowX)+leftToolbarWidth, int(windowY))
 	dartboardImageMax := image.Pt(dartboardImageMin.X+int(squareDimension), dartboardImageMin.Y+int(squareDimension))
 	//fmt.Printf("image min %d, max %d\n", imageMin, imageMax)
 
-	SetDartboardDimensions(window, squareDimension, dartboardImageMin, dartboardImageMax)
-	SetDartboardClickCallback(dartboardClickCallback)
+	dartboard.SetInfo(window, DartboardTexture, squareDimension, dartboardImageMin, dartboardImageMax)
 
 	window.Layout(
-		g.Custom(DartboardCustomFunc),
+		g.RadioButton("One Exact", radioValue == RadioExactScore).OnChange(func() { radioValue = RadioExactScore }),
+		g.RadioButton("One Statistical", radioValue == RadioOneAvgScore).OnChange(func() { radioValue = RadioOneAvgScore }),
+		g.RadioButton("Group Statistical", radioValue == RadioGroupAvgScore).OnChange(func() { radioValue = RadioGroupAvgScore }),
+		g.Custom(dartboard.DrawFunction),
 	)
 
 }
 
-func dartboardClickCallback(position boardgeo.BoardPosition) {
+func dartboardClickCallback(dartboard Dartboard, position boardgeo.BoardPosition) {
 	//fmt.Printf("Dartboard clicked at radius %g, angle %g\n", position.Radius, position.Angle)
 	if position.Radius <= 1.0 {
-		//markHitPoint(polarRadius, thetaDegrees)
-		_, score, description := boardgeo.DescribeBoardPoint(position)
-		fmt.Printf("%s: %d points\n", description, score)
+		if radioValue == RadioExactScore {
+			//markHitPoint(polarRadius, thetaDegrees)
+			_, score, description := boardgeo.DescribeBoardPoint(position)
+			fmt.Printf("Single, exact: %s: %d points\n", description, score)
+		} else if radioValue == RadioOneAvgScore {
+			oneStatisticalThrow(dartboard, position, accuracyModel)
+		} else if radioValue == RadioGroupAvgScore {
+			fmt.Println("STUB group statistical score")
+		} else {
+			fmt.Println("Invalid radio button value")
+		}
 	}
 }
 
-//func MainUiLoop() {
-//	window := g.SingleWindow()
-//	width, height := window.CurrentSize()
-//	//fmt.Printf("Window size: %dx%d\n", int(width), int(height))
-//	squareDimension := math.Min(float64(width), float64(height))
-//	//fmt.Printf("Square image is %d x %[1]d\n", int(squareDimension))
-//	window.Layout(
-//		g.Align(g.AlignCenter).To(
-//			g.ImageWithFile("Dartboard Illustration.png").
-//				OnClick(func() {
-//					polarRadius, thetaDegrees := boardgeo.CalcMousePolarPosition(squareDimension)
-//					position := boardgeo.BoardPosition{
-//						Radius: polarRadius,
-//						Angle:  thetaDegrees,
-//					}
-//					if polarRadius <= 1.0 {
-//						//markHitPoint(polarRadius, thetaDegrees)
-//						description, score := boardgeo.DescribeBoardPoint(position)
-//						fmt.Printf("%s: %d points\n", description, score)
-//					}
-//				}).
-//				Size(float32(squareDimension), float32(squareDimension)),
-//		),
-//	)
-//}
+func oneStatisticalThrow(dartboard Dartboard, position boardgeo.BoardPosition, model simulation.AccuracyModel) {
+	//fmt.Printf("oneStatisticalThrow STUB %v,\n", position)
+
+	//	Un-draw any previous markers or annotations
+	dartboard.RemoveThrowMarkers()
+
+	//  Draw a marker to record where we clicked
+	dartboard.DrawTargetMarker(position)
+
+	//	Draw a circle showing the accuracy radius around the clicked point
+	accuracyRadius := model.GetAccuracyRadius()
+	dartboard.DrawAccuracyCircle(position, accuracyRadius)
+
+	//	Get a modeled hit within the accuracy
+	//	Draw the hit within this circle
+	//	Calculate the hit score
+}

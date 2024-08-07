@@ -8,32 +8,104 @@ import (
 )
 
 const drawReferenceLines = false
+const throwsAtOneTarget = 1000
+const accuracyCircleThickness = 2
 
-var DartboardInfo struct {
+type Dartboard interface {
+	SetInfo(windowWidget *g.WindowWidget, texture *g.Texture,
+		squareDimension float64,
+		imageMin image.Point, imageMax image.Point)
+	SetClickCallback(callback func(dartboard Dartboard, position boardgeo.BoardPosition))
+	DrawFunction()
+	dartboardClicked()
+	RemoveThrowMarkers()
+	DrawTargetMarker(position boardgeo.BoardPosition)
+	DrawAccuracyCircle(position boardgeo.BoardPosition, radius float64)
+}
+
+type DartboardInstance struct {
 	window          *g.WindowWidget
-	Texture         *g.Texture
+	texture         *g.Texture
 	squareDimension float64
 	imageMin        image.Point
 	imageMax        image.Point
-	clickCallback   func(position boardgeo.BoardPosition)
-	//sema            sync.Mutex
+	clickCallback   func(dartboard Dartboard, position boardgeo.BoardPosition)
+	// We have drawn a marker showing where a throw was targeted
+	targetDrawn    bool
+	targetPosition boardgeo.BoardPosition
+	// We have drawn a circle showing the accuracy radius around a clicked point
+	accuracyDrawn    bool
+	accuracyPosition boardgeo.BoardPosition
+	accuracyRadius   float64
+	// Slice of zero or more hits resulting from modeled throw
+	hitPositions []boardgeo.BoardPosition
 }
 
-func SetDartboardDimensions(windowWidget *g.WindowWidget,
-	squareDimension float64,
-	imageMin image.Point, imageMax image.Point) {
-	DartboardInfo.window = windowWidget
-	DartboardInfo.squareDimension = squareDimension
-	DartboardInfo.imageMin = imageMin
-	DartboardInfo.imageMax = imageMax
+func NewDartboard(clickCallback func(dartboard Dartboard, position boardgeo.BoardPosition)) Dartboard {
+	instance := &DartboardInstance{
+		clickCallback: clickCallback,
+		targetDrawn:   false,
+		//accuracyDrawn: false,
+		//hitPositions: make([]boardgeo.BoardPosition, 0, throwsAtOneTarget),
+	}
+	//fmt.Println("NewDartboard returns", instance)
+	return instance
 }
 
-func SetDartboardClickCallback(callback func(position boardgeo.BoardPosition)) {
-	DartboardInfo.clickCallback = callback
+func (d *DartboardInstance) SetInfo(windowWidget *g.WindowWidget, texture *g.Texture, squareDimension float64, imageMin image.Point, imageMax image.Point) {
+	d.window = windowWidget
+	d.texture = texture
+	d.squareDimension = squareDimension
+	d.imageMin = imageMin
+	d.imageMax = imageMax
+	//fmt.Printf("After SetInfo, d = %#v\n", d)
 }
 
-func DartboardCustomFunc() {
-	d := DartboardInfo
+func (d *DartboardInstance) SetClickCallback(callback func(dartboard Dartboard, position boardgeo.BoardPosition)) {
+	d.clickCallback = callback
+}
+
+func (d *DartboardInstance) RemoveThrowMarkers() {
+	d.targetDrawn = false
+	d.accuracyDrawn = false
+	//fmt.Println("RemoveThrowMarkers STUB")
+}
+
+const targetCrossLength = 20
+
+// Eventually compute a colour guaranteed to contrast with the target location
+var targetCrossColour = color.RGBA{R: 100, G: 100, B: 100, A: 255}
+
+const targetCrossThickness = 2
+
+// Despite the name we don't actually draw the target marker here.  It's fine to let
+// the caller think that happens. But it would immediately be un-drawn because the
+// graphic UI is continually refreshed in a loop.  So, we record the desire for a marker,
+// and do the actual redraw in the following function, called from the loop
+func (d *DartboardInstance) DrawTargetMarker(position boardgeo.BoardPosition) {
+	d.targetDrawn = true
+	d.targetPosition = position
+}
+
+func (d *DartboardInstance) DoTargetMarkerDraw(canvas *g.Canvas) {
+	//fmt.Printf("DoTargetMarkerDraw at %#v\n", d.targetPosition)
+	//	Get the pixel coordinates of this point
+	xCentre, yCentre := boardgeo.GetDrawingXY(d.targetPosition)
+	xCentre += d.imageMin.X
+	yCentre += d.imageMin.Y
+	//	Draw an upright cross at this point
+
+	verticalFrom := image.Pt(xCentre, yCentre-targetCrossLength/2)
+	verticalTo := image.Pt(xCentre, yCentre+targetCrossLength/2)
+	canvas.AddLine(verticalFrom, verticalTo, targetCrossColour, targetCrossThickness)
+
+	horiontalFrom := image.Pt(xCentre-targetCrossLength/2, yCentre)
+	horizontalTo := image.Pt(xCentre+targetCrossLength/2, yCentre)
+	canvas.AddLine(horiontalFrom, horizontalTo, targetCrossColour, targetCrossThickness)
+
+}
+
+func (d *DartboardInstance) DrawFunction() {
 	if d.squareDimension == 0 {
 		//fmt.Println("Squaredimension 0, returning")
 		return
@@ -59,12 +131,12 @@ func DartboardCustomFunc() {
 	savedCsp := g.GetCursorScreenPos()
 	g.SetCursorScreenPos(d.imageMin)
 	g.InvisibleButton().Size(float32(d.squareDimension), float32(d.squareDimension)).
-		OnClick(dartboardClicked).
+		OnClick(d.dartboardClicked).
 		Build()
 	g.SetCursorScreenPos(savedCsp)
 
 	// Display dartboard image
-	canvas.AddImage(d.Texture, d.imageMin, d.imageMax)
+	canvas.AddImage(d.texture, d.imageMin, d.imageMax)
 
 	if drawReferenceLines {
 		//	For testing, draw a semitransparent circle on the centre
@@ -86,15 +158,40 @@ func DartboardCustomFunc() {
 		horizontalTo := image.Pt(xCentre+int(d.squareDimension/2), yCentre)
 		canvas.AddLine(horizontalFrom, horizontalTo, crossHairColour, 1)
 	}
+
+	//	If we have a target position to draw, do that
+	if d.targetDrawn {
+		d.DoTargetMarkerDraw(canvas)
+	}
+
+	//	If we have an accuracy circle to draw, do that
+	if d.accuracyDrawn {
+		d.DoAccuracyCircleDraw(canvas)
+	}
 }
 
-func dartboardClicked() {
+func (d *DartboardInstance) dartboardClicked() {
 	//fmt.Println("dartboard clicked")
-	if DartboardInfo.clickCallback == nil {
+	if d.clickCallback == nil {
 		//fmt.Println("  No callback function")
 	} else {
-		position := boardgeo.CalcMousePolarPosition(DartboardInfo.squareDimension,
-			DartboardInfo.imageMin, DartboardInfo.imageMax)
-		DartboardInfo.clickCallback(position)
+		position := boardgeo.CreateBoardPosition(g.GetMousePos(), d.squareDimension,
+			d.imageMin, d.imageMax)
+		d.clickCallback(d, position)
 	}
+}
+
+func (d *DartboardInstance) DrawAccuracyCircle(position boardgeo.BoardPosition, radius float64) {
+	d.accuracyDrawn = true
+	d.accuracyRadius = radius
+	d.accuracyPosition = position
+}
+
+func (d *DartboardInstance) DoAccuracyCircleDraw(canvas *g.Canvas) {
+	xCentre, yCentre := boardgeo.GetDrawingXY(d.accuracyPosition)
+	accuracyCirclePosition := image.Pt(xCentre+d.imageMin.X, yCentre+d.imageMin.Y)
+	accuracyCircleColour := targetCrossColour
+	drawRadius := d.accuracyRadius * d.squareDimension * boardgeo.ScoringAreaFraction / 2
+	//drawRadius := 1 * d.squareDimension * boardgeo.ScoringAreaFraction / 2
+	canvas.AddCircle(accuracyCirclePosition, float32(drawRadius), accuracyCircleColour, 0, accuracyCircleThickness)
 }

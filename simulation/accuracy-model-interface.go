@@ -12,11 +12,18 @@ import (
 // implementations will provide models of different levels of complexity.
 type AccuracyModel interface {
 	GetThrow(target boardgeo.BoardPosition) (boardgeo.BoardPosition, error)
+	GetAccuracyRadius() float64
 }
 
 // PerfectAccuracyModel is a trivial implementation of the accuracy model where the result
 // of a throw always hits the target
-type PerfectAccuracyModel struct{}
+type PerfectAccuracyModel struct {
+}
+
+func (p PerfectAccuracyModel) GetAccuracyRadius() float64 {
+	//TODO implement me
+	panic("implement me")
+}
 
 func NewPerfectAccuracyModel() AccuracyModel {
 	instance := &PerfectAccuracyModel{}
@@ -40,8 +47,12 @@ func NewCircularAccuracyModel(CEPRadius float64) AccuracyModel {
 	instance := &CircularAccuracyModel{
 		CEPRadius: CEPRadius,
 	}
-	fmt.Println("NewCircularAccuracyModel returns", instance)
+	//fmt.Println("NewCircularAccuracyModel returns", instance)
 	return instance
+}
+
+func (p CircularAccuracyModel) GetAccuracyRadius() float64 {
+	return p.CEPRadius
 }
 
 func (p CircularAccuracyModel) GetThrow(target boardgeo.BoardPosition) (boardgeo.BoardPosition, error) {
