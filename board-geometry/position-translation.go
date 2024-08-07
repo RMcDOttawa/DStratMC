@@ -1,7 +1,6 @@
 package boardgeo
 
 import (
-	"fmt"
 	"image"
 	"math"
 )
@@ -38,17 +37,19 @@ const scoringAreaRadiusNormalized = scoringAreaRadius / scoringAreaRadius
 // Scaling factor to normalize mouse positing inside board from 0 to 1 radius
 const ScoringAreaFraction = float64(scoringAreaDiameter) / float64(displayedBoardDiameter)
 
-// func CreateBoardPosition(window *g.WindowWidget) BoardPosition {
-func CreateBoardPosition(mousePosition image.Point, squareDimension float64, imageMin image.Point, _ image.Point) BoardPosition {
-	fmt.Printf("CreateBoardPosition(%g,%v) mp %v\n", squareDimension, imageMin, mousePosition)
+// func CreateBoardPositionFromXY(window *g.WindowWidget) BoardPosition {
+func CreateBoardPositionFromXY(mousePosition image.Point,
+	squareDimension float64,
+	imageMin image.Point) BoardPosition {
+	//fmt.Printf("CreateBoardPositionFromXY(%g,%v) mp %v\n", squareDimension, imageMin, mousePosition)
 	xMouseInside := mousePosition.X - imageMin.X
 	yMouseInside := mousePosition.Y - imageMin.Y
-	fmt.Printf("Absolute Mouse Position = (%d,%d), Relative Mouse = (%d,%d)\n",
-		mousePosition.X, mousePosition.Y, xMouseInside, yMouseInside)
+	//fmt.Printf("Absolute Mouse Position = (%d,%d), Relative Mouse = (%d,%d)\n",
+	//	mousePosition.X, mousePosition.Y, xMouseInside, yMouseInside)
 
 	xMouseZeroCentered := xMouseInside - int(math.Round(squareDimension/2))
 	yMouseZeroCentered := -(yMouseInside - int(math.Round(squareDimension/2)))
-	fmt.Printf("Mouse centred = (%d,%d)\n", xMouseZeroCentered, yMouseZeroCentered)
+	//fmt.Printf("Mouse centerd = (%d,%d)\n", xMouseZeroCentered, yMouseZeroCentered)
 
 	xFractionBoard := float64(xMouseZeroCentered) / (squareDimension / 2)
 	yFractionBoard := float64(yMouseZeroCentered) / (squareDimension / 2)
@@ -68,26 +69,6 @@ func CreateBoardPosition(mousePosition image.Point, squareDimension float64, ima
 	}
 	return position
 }
-
-//func PositionToXY(position BoardPosition, squareDimension float64, imageMin image.Point, imageMax image.Point) (int, int) {
-//	angleInRadians := position.Angle * math.Pi / 180.0
-//	xAsFraction := position.Radius * math.Sin(angleInRadians)
-//	yAsFraction := position.Radius * math.Cos(angleInRadians)
-//
-//	xZeroCentered := xAsFraction * (squareDimension / 2)
-//	yZeroCentered := yAsFraction * (squareDimension / 2)
-//
-//	xPositive := xZeroCentered + (squareDimension / 2)
-//	yPositive := (squareDimension / 2) - yZeroCentered
-//
-//	fmt.Printf("PositionToXY(%#v) gives (%g,%g)\n", position, xAsFraction, yAsFraction)
-//	fmt.Printf("  x zero-centered %g, y zero-centered %g\n", xZeroCentered, yZeroCentered)
-//	fmt.Printf("  x positive %g, y positive %g\n", xPositive, yPositive)
-//
-//	xStub := (imageMin.X + imageMax.X) / 2
-//	yStub := (imageMin.Y + imageMax.Y) / 2
-//	return xStub + 20, yStub + 20
-//}
 
 func GetDrawingXY(position BoardPosition) (int, int) {
 	return position.XMouseInside, position.YMouseInside

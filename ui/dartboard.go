@@ -10,6 +10,7 @@ import (
 const drawReferenceLines = false
 const throwsAtOneTarget = 1000
 const accuracyCircleThickness = 2
+const singleHitMarkerRadius = 5
 
 type Dartboard interface {
 	SetInfo(windowWidget *g.WindowWidget, texture *g.Texture,
@@ -21,6 +22,10 @@ type Dartboard interface {
 	RemoveThrowMarkers()
 	DrawTargetMarker(position boardgeo.BoardPosition)
 	DrawAccuracyCircle(position boardgeo.BoardPosition, radius float64)
+	GetScoringRadiusPixels() float64
+	GetImageMinPoint() image.Point
+	GetSquareDimension() float64
+	AddHitMarker(hit boardgeo.BoardPosition)
 }
 
 type DartboardInstance struct {
@@ -45,11 +50,24 @@ func NewDartboard(clickCallback func(dartboard Dartboard, position boardgeo.Boar
 	instance := &DartboardInstance{
 		clickCallback: clickCallback,
 		targetDrawn:   false,
-		//accuracyDrawn: false,
-		//hitPositions: make([]boardgeo.BoardPosition, 0, throwsAtOneTarget),
+		accuracyDrawn: false,
+		hitPositions:  make([]boardgeo.BoardPosition, 0, throwsAtOneTarget),
 	}
 	//fmt.Println("NewDartboard returns", instance)
 	return instance
+}
+
+func (d *DartboardInstance) GetSquareDimension() float64 {
+	return d.squareDimension
+}
+
+func (d *DartboardInstance) GetImageMinPoint() image.Point {
+	return d.imageMin
+}
+
+func (d *DartboardInstance) GetScoringRadiusPixels() float64 {
+	radius := d.squareDimension * boardgeo.ScoringAreaFraction / 2
+	return radius
 }
 
 func (d *DartboardInstance) SetInfo(windowWidget *g.WindowWidget, texture *g.Texture, squareDimension float64, imageMin image.Point, imageMax image.Point) {
@@ -68,6 +86,7 @@ func (d *DartboardInstance) SetClickCallback(callback func(dartboard Dartboard, 
 func (d *DartboardInstance) RemoveThrowMarkers() {
 	d.targetDrawn = false
 	d.accuracyDrawn = false
+	d.hitPositions = make([]boardgeo.BoardPosition, 0, throwsAtOneTarget)
 	//fmt.Println("RemoveThrowMarkers STUB")
 }
 
@@ -77,33 +96,6 @@ const targetCrossLength = 20
 var targetCrossColour = color.RGBA{R: 100, G: 100, B: 100, A: 255}
 
 const targetCrossThickness = 2
-
-// Despite the name we don't actually draw the target marker here.  It's fine to let
-// the caller think that happens. But it would immediately be un-drawn because the
-// graphic UI is continually refreshed in a loop.  So, we record the desire for a marker,
-// and do the actual redraw in the following function, called from the loop
-func (d *DartboardInstance) DrawTargetMarker(position boardgeo.BoardPosition) {
-	d.targetDrawn = true
-	d.targetPosition = position
-}
-
-func (d *DartboardInstance) DoTargetMarkerDraw(canvas *g.Canvas) {
-	//fmt.Printf("DoTargetMarkerDraw at %#v\n", d.targetPosition)
-	//	Get the pixel coordinates of this point
-	xCentre, yCentre := boardgeo.GetDrawingXY(d.targetPosition)
-	xCentre += d.imageMin.X
-	yCentre += d.imageMin.Y
-	//	Draw an upright cross at this point
-
-	verticalFrom := image.Pt(xCentre, yCentre-targetCrossLength/2)
-	verticalTo := image.Pt(xCentre, yCentre+targetCrossLength/2)
-	canvas.AddLine(verticalFrom, verticalTo, targetCrossColour, targetCrossThickness)
-
-	horiontalFrom := image.Pt(xCentre-targetCrossLength/2, yCentre)
-	horizontalTo := image.Pt(xCentre+targetCrossLength/2, yCentre)
-	canvas.AddLine(horiontalFrom, horizontalTo, targetCrossColour, targetCrossThickness)
-
-}
 
 func (d *DartboardInstance) DrawFunction() {
 	if d.squareDimension == 0 {
@@ -168,6 +160,8 @@ func (d *DartboardInstance) DrawFunction() {
 	if d.accuracyDrawn {
 		d.DoAccuracyCircleDraw(canvas)
 	}
+
+	d.drawHitMarkers()
 }
 
 func (d *DartboardInstance) dartboardClicked() {
@@ -175,10 +169,38 @@ func (d *DartboardInstance) dartboardClicked() {
 	if d.clickCallback == nil {
 		//fmt.Println("  No callback function")
 	} else {
-		position := boardgeo.CreateBoardPosition(g.GetMousePos(), d.squareDimension,
-			d.imageMin, d.imageMax)
+		position := boardgeo.CreateBoardPositionFromXY(g.GetMousePos(), d.squareDimension,
+			d.imageMin)
 		d.clickCallback(d, position)
 	}
+}
+
+// Despite the name we don't actually draw the target marker here.  It's fine to let
+// the caller think that happens. But it would immediately be un-drawn because the
+// graphic UI is continually refreshed in a loop.  So, we record the desire for a marker,
+// and do the actual redraw in the following function, called from the loop
+func (d *DartboardInstance) DrawTargetMarker(position boardgeo.BoardPosition) {
+	//fmt.Printf("DrawTargetMarker at %v\n", position)
+	d.targetDrawn = true
+	d.targetPosition = position
+}
+
+func (d *DartboardInstance) DoTargetMarkerDraw(canvas *g.Canvas) {
+	//fmt.Printf("DoTargetMarkerDraw at %#v\n", d.targetPosition)
+	//	Get the pixel coordinates of this point
+	xCentre, yCentre := boardgeo.GetDrawingXY(d.targetPosition)
+	xCentre += d.imageMin.X
+	yCentre += d.imageMin.Y
+	//	Draw an upright cross at this point
+
+	verticalFrom := image.Pt(xCentre, yCentre-targetCrossLength/2)
+	verticalTo := image.Pt(xCentre, yCentre+targetCrossLength/2)
+	canvas.AddLine(verticalFrom, verticalTo, targetCrossColour, targetCrossThickness)
+
+	horizontalFrom := image.Pt(xCentre-targetCrossLength/2, yCentre)
+	horizontalTo := image.Pt(xCentre+targetCrossLength/2, yCentre)
+	canvas.AddLine(horizontalFrom, horizontalTo, targetCrossColour, targetCrossThickness)
+
 }
 
 func (d *DartboardInstance) DrawAccuracyCircle(position boardgeo.BoardPosition, radius float64) {
@@ -194,4 +216,22 @@ func (d *DartboardInstance) DoAccuracyCircleDraw(canvas *g.Canvas) {
 	drawRadius := d.accuracyRadius * d.squareDimension * boardgeo.ScoringAreaFraction / 2
 	//drawRadius := 1 * d.squareDimension * boardgeo.ScoringAreaFraction / 2
 	canvas.AddCircle(accuracyCirclePosition, float32(drawRadius), accuracyCircleColour, 0, accuracyCircleThickness)
+}
+
+func (d *DartboardInstance) AddHitMarker(hit boardgeo.BoardPosition) {
+	d.hitPositions = append(d.hitPositions, hit)
+}
+
+func (d *DartboardInstance) drawHitMarkers() {
+	for _, hit := range d.hitPositions {
+		xCentre, yCentre := boardgeo.GetDrawingXY(hit)
+		xCentre += d.imageMin.X
+		yCentre += d.imageMin.Y
+		//	Draw a filled circle at this point
+		hitPosition := image.Pt(xCentre, yCentre)
+		hitColour := color.RGBA{R: 0, G: 0, B: 255, A: 255}
+		hitRadius := float32(singleHitMarkerRadius)
+		canvas := g.GetCanvas()
+		canvas.AddCircleFilled(hitPosition, hitRadius, hitColour)
+	}
 }

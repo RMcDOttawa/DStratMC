@@ -3,6 +3,8 @@ package simulation
 import (
 	boardgeo "DStratMC/board-geometry"
 	"fmt"
+	"image"
+	"math"
 	"math/rand"
 )
 
@@ -11,7 +13,10 @@ import (
 // Accuracy is determined by the type of accuracy model used - a variety of
 // implementations will provide models of different levels of complexity.
 type AccuracyModel interface {
-	GetThrow(target boardgeo.BoardPosition) (boardgeo.BoardPosition, error)
+	GetThrow(target boardgeo.BoardPosition,
+		scoringRadius float64,
+		squareDimension float64,
+		startPoint image.Point) (boardgeo.BoardPosition, error)
 	GetAccuracyRadius() float64
 }
 
@@ -31,7 +36,10 @@ func NewPerfectAccuracyModel() AccuracyModel {
 	return instance
 }
 
-func (p PerfectAccuracyModel) GetThrow(target boardgeo.BoardPosition) (boardgeo.BoardPosition, error) {
+func (p PerfectAccuracyModel) GetThrow(target boardgeo.BoardPosition,
+	_ float64,
+	_ float64,
+	_ image.Point) (boardgeo.BoardPosition, error) {
 	//fmt.Printf("PerfectAccuracyModel/GetThrow(%#v)\n", target)
 	return target, nil
 }
@@ -55,33 +63,45 @@ func (p CircularAccuracyModel) GetAccuracyRadius() float64 {
 	return p.CEPRadius
 }
 
-func (p CircularAccuracyModel) GetThrow(target boardgeo.BoardPosition) (boardgeo.BoardPosition, error) {
-	//fmt.Printf("CircularAccuracyModel/GetThrow(%#v) STUB\n", target)
-
-	//	Get random deviation from target radius as +/- CEP
-	signedDeviation := rand.Float64()*(2*p.CEPRadius) - p.CEPRadius
-	//fmt.Printf("With CEP %g, radius deviation is %g\n", p.CEPRadius, signedDeviation)
-
-	//	We'll pick a new angle that deviates from the target angle by the CEP factor.  Since the deviation may
-	//	drive it out of the range (0 - 360) we normalize
-	angleDeviationFactor := rand.Float64()*(2*p.CEPRadius) - p.CEPRadius
-	unNormalizedAngle := target.Angle + target.Angle*angleDeviationFactor
-	newAngle := unNormalizedAngle
-	if newAngle < 0 {
-		newAngle += 360
-	}
-	if newAngle > 360 {
-		newAngle -= 360
-	}
-
-	//fmt.Printf("Angle %g, deviation factor %g, deviation %g, raw %g, new %g\n",
-	//	target.angle, angleDeviationFactor, unNormalizedAngle, newAngle)
-
-	result := boardgeo.BoardPosition{
-		Radius: target.Radius + signedDeviation,
-		Angle:  newAngle,
-	}
-
-	//fmt.Printf("Result: %v\n", result)
+// Using cartesian
+func (p CircularAccuracyModel) GetThrow(target boardgeo.BoardPosition,
+	scoringRadius float64,
+	squareDimension float64,
+	startPoint image.Point) (boardgeo.BoardPosition, error) {
+	//	Polar coordinate deviation
+	randomTheta := rand.Float64() * 2 * math.Pi
+	randomRadius := p.CEPRadius * math.Sqrt(rand.Float64()) * scoringRadius
+	//	Convert to cartesian
+	newX := float64(target.XMouseInside) + randomRadius*math.Cos(randomTheta)
+	newY := float64(target.YMouseInside) + randomRadius*math.Sin(randomTheta)
+	//	Convert to board position
+	point := image.Pt(int(math.Round(newX))+startPoint.X, int(math.Round(newY))+startPoint.Y)
+	result := boardgeo.CreateBoardPositionFromXY(point, squareDimension, startPoint)
 	return result, nil
 }
+
+// Using polar
+//func (p CircularAccuracyModel) GetThrow(target boardgeo.BoardPosition,
+//	scoringRadius float64,
+//	squareDimension float64,
+//	startPoint image.Point) (boardgeo.BoardPosition, error) {
+//	fmt.Printf("CircularAccuracyModel/GetThrow target %v, CEP %g, sr %g, sd %g, stp %v\n",
+//		target, p.CEPRadius, scoringRadius, squareDimension, startPoint)
+//
+//	//	Get a random point inside the circle centred at the given target and with radius CEP
+//	randomThetaRadians := rand.Float64() * 2 * math.Pi
+//	randomRadius := p.CEPRadius * math.Sqrt(rand.Float64())
+//	fmt.Printf("  random theta %g, random radius %g\n", randomThetaRadians, randomRadius)
+//
+//	// Convert to absolute polar coordinates
+//	radiusResult := math.Sqrt(target.Radius*target.Radius +
+//		randomRadius*randomRadius +
+//		2*target.Radius*randomRadius*math.Cos(randomThetaRadians))
+//	thetaResult := target.Angle + math.Atan2(randomRadius*math.Sin(randomThetaRadians),
+//		target.Radius+randomRadius*math.Cos(randomThetaRadians))
+//	fmt.Printf("  absolute polar R=%g, theta=%g\n", radiusResult, thetaResult)
+//
+//	result := boardgeo.CreateBoardPositionFromXY()
+//	fmt.Printf("   Result: %v\n", result)
+//	return result, nil
+//}

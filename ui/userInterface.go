@@ -84,7 +84,7 @@ func dartboardClickCallback(dartboard Dartboard, position boardgeo.BoardPosition
 }
 
 func oneStatisticalThrow(dartboard Dartboard, position boardgeo.BoardPosition, model simulation.AccuracyModel) {
-	//fmt.Printf("oneStatisticalThrow STUB %v,\n", position)
+	fmt.Printf("oneStatisticalThrow  %v,\n", position)
 
 	//	Un-draw any previous markers or annotations
 	dartboard.RemoveThrowMarkers()
@@ -97,6 +97,18 @@ func oneStatisticalThrow(dartboard Dartboard, position boardgeo.BoardPosition, m
 	dartboard.DrawAccuracyCircle(position, accuracyRadius)
 
 	//	Get a modeled hit within the accuracy
+	hit, err := accuracyModel.GetThrow(position,
+		dartboard.GetScoringRadiusPixels(),
+		dartboard.GetSquareDimension(),
+		dartboard.GetImageMinPoint())
+	if err != nil {
+		fmt.Printf("Error getting throw %v", err)
+		return
+	}
+	fmt.Printf("Hit: %#v \n", hit)
+
 	//	Draw the hit within this circle
+	dartboard.AddHitMarker(hit)
+
 	//	Calculate the hit score
 }
