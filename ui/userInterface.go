@@ -7,6 +7,7 @@ import (
 	g "github.com/AllenDang/giu"
 	"image"
 	"math"
+	"strconv"
 )
 
 const (
@@ -28,6 +29,13 @@ func UserInterfaceSetup(theAccuracyModel simulation.AccuracyModel) {
 	radioValue = RadioOneAvgScore
 	dartboard = NewDartboard(dartboardClickCallback)
 }
+
+var scoreDisplay string
+var messageDisplay string
+
+var throwTotal int64
+var throwCount int64
+var throwAverage float64
 
 func MainUiLoop() {
 	window := g.SingleWindow()
@@ -58,21 +66,48 @@ func MainUiLoop() {
 	dartboard.SetInfo(window, DartboardTexture, squareDimension, dartboardImageMin, dartboardImageMax)
 
 	window.Layout(
-		g.RadioButton("One Exact", radioValue == RadioExactScore).OnChange(func() { radioValue = RadioExactScore }),
-		g.RadioButton("One Statistical", radioValue == RadioOneAvgScore).OnChange(func() { radioValue = RadioOneAvgScore }),
-		g.RadioButton("Group Statistical", radioValue == RadioGroupAvgScore).OnChange(func() { radioValue = RadioGroupAvgScore }),
+		g.RadioButton("One Exact", radioValue == RadioExactScore).OnChange(func() { radioValue = RadioExactScore; radioChanged() }),
+		g.RadioButton("One Statistical", radioValue == RadioOneAvgScore).OnChange(func() { radioValue = RadioOneAvgScore; radioChanged() }),
+		g.RadioButton("Group Statistical", radioValue == RadioGroupAvgScore).OnChange(func() { radioValue = RadioGroupAvgScore; radioChanged() }),
+		g.Label(""),
+		g.Button("Reset").OnClick(radioChanged),
+		g.Label(""),
+		g.Label(messageDisplay),
+		g.Label(scoreDisplay),
+		g.Condition(throwCount > 0,
+			g.Layout{
+				g.Label(""),
+				g.Label("Throws: " + strconv.Itoa(int(throwCount))),
+				g.Label("Total: " + strconv.Itoa(int(throwTotal))),
+				g.Label("Average: " + strconv.FormatFloat(throwAverage, 'f', 1, 64)),
+			},
+			nil),
 		g.Custom(dartboard.DrawFunction),
 	)
 
 }
 
+func radioChanged() {
+	scoreDisplay = ""
+	messageDisplay = ""
+	throwTotal = 0
+	throwCount = 0
+	throwAverage = 0
+	dartboard.RemoveThrowMarkers()
+}
+
 func dartboardClickCallback(dartboard Dartboard, position boardgeo.BoardPosition) {
 	//fmt.Printf("Dartboard clicked at radius %g, angle %g\n", position.Radius, position.Angle)
 	if position.Radius <= 1.0 {
+		messageDisplay = ""
+		scoreDisplay = ""
+		dartboard.RemoveThrowMarkers()
 		if radioValue == RadioExactScore {
 			//markHitPoint(polarRadius, thetaDegrees)
+			dartboard.DrawTargetMarker(position)
 			_, score, description := boardgeo.DescribeBoardPoint(position)
-			fmt.Printf("Single, exact: %s: %d points\n", description, score)
+			messageDisplay = description
+			scoreDisplay = strconv.Itoa(score) + " points"
 		} else if radioValue == RadioOneAvgScore {
 			oneStatisticalThrow(dartboard, position, accuracyModel)
 		} else if radioValue == RadioGroupAvgScore {
@@ -84,10 +119,7 @@ func dartboardClickCallback(dartboard Dartboard, position boardgeo.BoardPosition
 }
 
 func oneStatisticalThrow(dartboard Dartboard, position boardgeo.BoardPosition, model simulation.AccuracyModel) {
-	fmt.Printf("oneStatisticalThrow  %v,\n", position)
-
-	//	Un-draw any previous markers or annotations
-	dartboard.RemoveThrowMarkers()
+	//fmt.Printf("oneStatisticalThrow  %v,\n", position)
 
 	//  Draw a marker to record where we clicked
 	dartboard.DrawTargetMarker(position)
@@ -105,10 +137,33 @@ func oneStatisticalThrow(dartboard Dartboard, position boardgeo.BoardPosition, m
 		fmt.Printf("Error getting throw %v", err)
 		return
 	}
-	fmt.Printf("Hit: %#v \n", hit)
+	//fmt.Printf("Hit: %#v \n", hit)
 
 	//	Draw the hit within this circle
 	dartboard.AddHitMarker(hit)
 
 	//	Calculate the hit score
+	_, score, description := boardgeo.DescribeBoardPoint(hit)
+	messageDisplay = description
+	scoreDisplay = strconv.Itoa(score) + " points"
+	throwCount++
+	throwTotal += int64(score)
+	throwAverage = float64(throwTotal) / float64(throwCount)
+	g.Update()
+
+	//	Add a second hit just to see if it works
+	//hit, err = accuracyModel.GetThrow(position,
+	//	dartboard.GetScoringRadiusPixels(),
+	//	dartboard.GetSquareDimension(),
+	//	dartboard.GetImageMinPoint())
+	//if err != nil {
+	//	fmt.Printf("Error getting throw %v", err)
+	//	return
+	//}
+	////fmt.Printf("Hit: %#v \n", hit)
+	//
+	////	Draw the hit within this circle
+	//dartboard.AddHitMarker(hit)
+	//g.Update()
+
 }

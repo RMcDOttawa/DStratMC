@@ -45,7 +45,7 @@ func CreateOrLoadAccuracyModel(modelPath string) (simulation.AccuracyModel, erro
 	}
 	//fmt.Printf("CreateOrLoadAccuracyModel(%s) STUB\n", modelPath)
 	//	return simulation.NewCircularAccuracyModel(0.1), nil
-	return simulation.NewCircularAccuracyModel(5.5 / 17.0), nil
+	return simulation.NewCircularAccuracyModel(4.5 / 17.0), nil
 	//	//return simulation.NewCircularAccuracyModel(0.23), nil
 	//	//return simulation.NewCircularAccuracyModel(0.3), nil
 	//	//return simulation.NewCircularAccuracyModel(0.4), nil
