@@ -30,6 +30,14 @@ const (
 	BoardArea_Treble
 )
 
+// Board colours
+const (
+	Board_Colour_Black = iota
+	Board_Colour_White
+	Board_Colour_Red
+	Board_Colour_Green
+)
+
 // BoardAreaDescription translates board position areas to text (change this for different languages)
 var BoardAreaDescription = map[int]string{
 	BoardArea_Out:         "Out",
@@ -79,4 +87,92 @@ func DescribeBoardPoint(point BoardPosition) (int, int, string) {
 	}
 	asString := BoardAreaDescription[segment] + " " + strconv.Itoa(singlePointValue)
 	return segment, score, asString
+}
+
+func GetColourForSegment(segment int, score int) int {
+	if segment == BoardArea_InnerSingle || segment == BoardArea_OuterSingle || segment == BoardArea_Out {
+		return colourForSingle(score)
+	} else if segment == BoardArea_Double {
+		return colourForDouble(score)
+	} else if segment == BoardArea_Treble {
+		return colourForTreble(score)
+	} else if segment == BoardArea_InnerBull {
+		return Board_Colour_Red
+	} else if segment == BoardArea_OuterBull {
+		return Board_Colour_Green
+	} else {
+		panic("Unexpected board segment type: " + strconv.Itoa(segment))
+	}
+}
+
+var multiplierRingColours = []int{
+	Board_Colour_Green, //	1
+	Board_Colour_Red,   //	2
+	Board_Colour_Red,   //	3
+	Board_Colour_Green, //	4
+	Board_Colour_Green, //	5
+	Board_Colour_Green, //	6
+	Board_Colour_Red,   //	7
+	Board_Colour_Red,   //	8
+	Board_Colour_Green, //	9
+	Board_Colour_Red,   //	10
+	Board_Colour_Green, //	11
+	Board_Colour_Red,   //	12
+	Board_Colour_Red,   //	13
+	Board_Colour_Red,   //	14
+	Board_Colour_Green, //	15
+	Board_Colour_Green, //	16
+	Board_Colour_Green, //	17
+	Board_Colour_Red,   //	18
+	Board_Colour_Green, //	19
+	Board_Colour_Red,   //	20
+}
+
+func colourForDouble(score int) int {
+	return multiplierRingColours[(score/2)-1]
+}
+
+func colourForTreble(score int) int {
+	return multiplierRingColours[(score/3)-1]
+}
+
+var singleSegmentColours = []int{
+	Board_Colour_White, //	1
+	Board_Colour_Black, //	2
+	Board_Colour_Black, //	3
+	Board_Colour_White, //	4
+	Board_Colour_White, //	5
+	Board_Colour_White, //	6
+	Board_Colour_Black, //	7
+	Board_Colour_Black, //	8
+	Board_Colour_White, //	9
+	Board_Colour_Black, //	10
+	Board_Colour_White, //	11
+	Board_Colour_Black, //	12
+	Board_Colour_Black, //	13
+	Board_Colour_Black, //	14
+	Board_Colour_White, //	15
+	Board_Colour_White, //	16
+	Board_Colour_White, //	17
+	Board_Colour_Black, //	18
+	Board_Colour_White, //	19
+	Board_Colour_Black, //	20
+}
+
+func colourForSingle(score int) int {
+	return singleSegmentColours[score-1]
+}
+
+func GetContrastingColour(colour int) (int, int, int) {
+	switch colour {
+	case Board_Colour_Black:
+		return 220, 220, 220
+	case Board_Colour_White:
+		return 50, 50, 50
+	case Board_Colour_Red:
+		return 56, 240, 140
+	case Board_Colour_Green:
+		return 240, 112, 249
+	}
+	return 0, 0, 0
 }

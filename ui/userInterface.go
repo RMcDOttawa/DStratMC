@@ -20,7 +20,7 @@ var radioValue int
 
 const LeftToolbarMinimumWidth = 200
 const singleHitMarkerRadius = 5
-const multipleHitMarkerRadius = 2
+const multipleHitMarkerRadius = 1
 
 const ThrowsAtOneTarget = 1_000
 
@@ -30,7 +30,7 @@ var dartboard Dartboard
 
 func UserInterfaceSetup(theAccuracyModel simulation.AccuracyModel) {
 	accuracyModel = theAccuracyModel
-	radioValue = RadioGroupAvgScore
+	radioValue = RadioOneAvgScore
 	dartboard = NewDartboard(dartboardClickCallback)
 }
 
@@ -181,6 +181,7 @@ func multipleStatisticalThrows(dartboard Dartboard, position boardgeo.BoardPosit
 	//	Draw a circle showing the accuracy radius around the clicked point
 	accuracyRadius := model.GetAccuracyRadius()
 	dartboard.DrawAccuracyCircle(position, accuracyRadius)
+	dartboard.AllocateHitsSpace(int(numThrowsField))
 
 	throwCount = 0
 	throwTotal = 0
@@ -204,7 +205,7 @@ func multipleStatisticalThrows(dartboard Dartboard, position boardgeo.BoardPosit
 		throwCount++
 		throwTotal += int64(score)
 		throwAverage = float64(throwTotal) / float64(throwCount)
-		g.Update()
 	}
+	g.Update()
 
 }

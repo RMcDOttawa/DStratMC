@@ -9,6 +9,8 @@ import (
 
 const drawReferenceLines = false
 const accuracyCircleThickness = 2
+const targetCrossAlpha = 230
+const hitMarkerAlpha = 200
 
 type Dartboard interface {
 	SetInfo(windowWidget *g.WindowWidget, texture *g.Texture,
@@ -24,6 +26,7 @@ type Dartboard interface {
 	GetImageMinPoint() image.Point
 	GetSquareDimension() float64
 	AddHitMarker(hit boardgeo.BoardPosition, markerRadius int)
+	AllocateHitsSpace(i int)
 }
 
 type DartboardInstance struct {
@@ -43,6 +46,10 @@ type DartboardInstance struct {
 	// Slice of zero or more hits resulting from modeled throw
 	hitPositions    []boardgeo.BoardPosition
 	hitMarkerRadius int
+}
+
+func (d *DartboardInstance) AllocateHitsSpace(numHits int) {
+	d.hitPositions = make([]boardgeo.BoardPosition, 0, numHits)
 }
 
 func NewDartboard(clickCallback func(dartboard Dartboard, position boardgeo.BoardPosition)) Dartboard {
@@ -190,16 +197,29 @@ func (d *DartboardInstance) DoTargetMarkerDraw(canvas *g.Canvas) {
 	xCentre, yCentre := boardgeo.GetDrawingXY(d.targetPosition)
 	xCentre += d.imageMin.X
 	yCentre += d.imageMin.Y
+
+	//	Get a contrasting colour that will be visible on this board section
+	red, green, blue := contrastingColourForPosition(d.targetPosition)
+	colour := color.RGBA{R: uint8(red), G: uint8(green), B: uint8(blue), A: targetCrossAlpha}
+
 	//	Draw an upright cross at this point
 
 	verticalFrom := image.Pt(xCentre, yCentre-targetCrossLength/2)
 	verticalTo := image.Pt(xCentre, yCentre+targetCrossLength/2)
-	canvas.AddLine(verticalFrom, verticalTo, targetCrossColour, targetCrossThickness)
+	canvas.AddLine(verticalFrom, verticalTo, colour, targetCrossThickness)
 
 	horizontalFrom := image.Pt(xCentre-targetCrossLength/2, yCentre)
 	horizontalTo := image.Pt(xCentre+targetCrossLength/2, yCentre)
-	canvas.AddLine(horizontalFrom, horizontalTo, targetCrossColour, targetCrossThickness)
+	canvas.AddLine(horizontalFrom, horizontalTo, colour, targetCrossThickness)
+	boardgeo.DescribeBoardPoint(d.targetPosition)
+}
 
+// Get RGB values for a colour that contrasts with the colour under the given board position
+func contrastingColourForPosition(position boardgeo.BoardPosition) (int, int, int) {
+	segment, score, _ := boardgeo.DescribeBoardPoint(position)
+	underlyingColour := boardgeo.GetColourForSegment(segment, score)
+	red, green, blue := boardgeo.GetContrastingColour(underlyingColour)
+	return red, green, blue
 }
 
 func (d *DartboardInstance) DrawAccuracyCircle(position boardgeo.BoardPosition, radius float64) {
@@ -228,8 +248,11 @@ func (d *DartboardInstance) drawHitMarkers() {
 		xCentre += d.imageMin.X
 		yCentre += d.imageMin.Y
 		//	Draw a filled circle at this point
+		segment, score, _ := boardgeo.DescribeBoardPoint(hit)
+		underlyingColour := boardgeo.GetColourForSegment(segment, score)
+		red, green, blue := boardgeo.GetContrastingColour(underlyingColour)
 		hitPosition := image.Pt(xCentre, yCentre)
-		hitColour := color.RGBA{R: 0, G: 0, B: 255, A: 64}
+		hitColour := color.RGBA{R: uint8(red), G: uint8(green), B: uint8(blue), A: hitMarkerAlpha}
 		hitRadius := float32(d.hitMarkerRadius)
 		canvas := g.GetCanvas()
 		canvas.AddCircleFilled(hitPosition, hitRadius, hitColour)
