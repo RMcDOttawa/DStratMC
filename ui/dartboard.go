@@ -8,9 +8,7 @@ import (
 )
 
 const drawReferenceLines = false
-const throwsAtOneTarget = 1000
 const accuracyCircleThickness = 2
-const singleHitMarkerRadius = 5
 
 type Dartboard interface {
 	SetInfo(windowWidget *g.WindowWidget, texture *g.Texture,
@@ -25,7 +23,7 @@ type Dartboard interface {
 	GetScoringRadiusPixels() float64
 	GetImageMinPoint() image.Point
 	GetSquareDimension() float64
-	AddHitMarker(hit boardgeo.BoardPosition)
+	AddHitMarker(hit boardgeo.BoardPosition, markerRadius int)
 }
 
 type DartboardInstance struct {
@@ -43,7 +41,8 @@ type DartboardInstance struct {
 	accuracyPosition boardgeo.BoardPosition
 	accuracyRadius   float64
 	// Slice of zero or more hits resulting from modeled throw
-	hitPositions []boardgeo.BoardPosition
+	hitPositions    []boardgeo.BoardPosition
+	hitMarkerRadius int
 }
 
 func NewDartboard(clickCallback func(dartboard Dartboard, position boardgeo.BoardPosition)) Dartboard {
@@ -51,7 +50,7 @@ func NewDartboard(clickCallback func(dartboard Dartboard, position boardgeo.Boar
 		clickCallback: clickCallback,
 		targetDrawn:   false,
 		accuracyDrawn: false,
-		hitPositions:  make([]boardgeo.BoardPosition, 0, throwsAtOneTarget),
+		hitPositions:  make([]boardgeo.BoardPosition, 0, ThrowsAtOneTarget),
 	}
 	//fmt.Println("NewDartboard returns", instance)
 	return instance
@@ -86,7 +85,7 @@ func (d *DartboardInstance) SetClickCallback(callback func(dartboard Dartboard, 
 func (d *DartboardInstance) RemoveThrowMarkers() {
 	d.targetDrawn = false
 	d.accuracyDrawn = false
-	d.hitPositions = make([]boardgeo.BoardPosition, 0, throwsAtOneTarget)
+	d.hitPositions = make([]boardgeo.BoardPosition, 0, ThrowsAtOneTarget)
 	//fmt.Println("RemoveThrowMarkers STUB")
 }
 
@@ -218,8 +217,9 @@ func (d *DartboardInstance) DoAccuracyCircleDraw(canvas *g.Canvas) {
 	canvas.AddCircle(accuracyCirclePosition, float32(drawRadius), accuracyCircleColour, 0, accuracyCircleThickness)
 }
 
-func (d *DartboardInstance) AddHitMarker(hit boardgeo.BoardPosition) {
+func (d *DartboardInstance) AddHitMarker(hit boardgeo.BoardPosition, markerRadius int) {
 	d.hitPositions = append(d.hitPositions, hit)
+	d.hitMarkerRadius = markerRadius
 }
 
 func (d *DartboardInstance) drawHitMarkers() {
@@ -229,8 +229,8 @@ func (d *DartboardInstance) drawHitMarkers() {
 		yCentre += d.imageMin.Y
 		//	Draw a filled circle at this point
 		hitPosition := image.Pt(xCentre, yCentre)
-		hitColour := color.RGBA{R: 0, G: 0, B: 255, A: 255}
-		hitRadius := float32(singleHitMarkerRadius)
+		hitColour := color.RGBA{R: 0, G: 0, B: 255, A: 64}
+		hitRadius := float32(d.hitMarkerRadius)
 		canvas := g.GetCanvas()
 		canvas.AddCircleFilled(hitPosition, hitRadius, hitColour)
 	}

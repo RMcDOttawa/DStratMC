@@ -19,6 +19,10 @@ const (
 var radioValue int
 
 const LeftToolbarMinimumWidth = 200
+const singleHitMarkerRadius = 5
+const multipleHitMarkerRadius = 2
+
+const ThrowsAtOneTarget = 10_000
 
 var accuracyModel simulation.AccuracyModel
 var DartboardTexture *g.Texture
@@ -26,7 +30,7 @@ var dartboard Dartboard
 
 func UserInterfaceSetup(theAccuracyModel simulation.AccuracyModel) {
 	accuracyModel = theAccuracyModel
-	radioValue = RadioOneAvgScore
+	radioValue = RadioGroupAvgScore
 	dartboard = NewDartboard(dartboardClickCallback)
 }
 
@@ -111,7 +115,7 @@ func dartboardClickCallback(dartboard Dartboard, position boardgeo.BoardPosition
 		} else if radioValue == RadioOneAvgScore {
 			oneStatisticalThrow(dartboard, position, accuracyModel)
 		} else if radioValue == RadioGroupAvgScore {
-			fmt.Println("STUB group statistical score")
+			multipleStatisticalThrows(dartboard, position, accuracyModel)
 		} else {
 			fmt.Println("Invalid radio button value")
 		}
@@ -140,7 +144,7 @@ func oneStatisticalThrow(dartboard Dartboard, position boardgeo.BoardPosition, m
 	//fmt.Printf("Hit: %#v \n", hit)
 
 	//	Draw the hit within this circle
-	dartboard.AddHitMarker(hit)
+	dartboard.AddHitMarker(hit, singleHitMarkerRadius)
 
 	//	Calculate the hit score
 	_, score, description := boardgeo.DescribeBoardPoint(hit)
@@ -151,19 +155,41 @@ func oneStatisticalThrow(dartboard Dartboard, position boardgeo.BoardPosition, m
 	throwAverage = float64(throwTotal) / float64(throwCount)
 	g.Update()
 
-	//	Add a second hit just to see if it works
-	//hit, err = accuracyModel.GetThrow(position,
-	//	dartboard.GetScoringRadiusPixels(),
-	//	dartboard.GetSquareDimension(),
-	//	dartboard.GetImageMinPoint())
-	//if err != nil {
-	//	fmt.Printf("Error getting throw %v", err)
-	//	return
-	//}
-	////fmt.Printf("Hit: %#v \n", hit)
-	//
-	////	Draw the hit within this circle
-	//dartboard.AddHitMarker(hit)
-	//g.Update()
+}
+
+func multipleStatisticalThrows(dartboard Dartboard, position boardgeo.BoardPosition, model simulation.AccuracyModel) {
+	//fmt.Printf("multipleStatisticalThrows  %v,\n", position)
+
+	//  Draw a marker to record where we clicked
+	dartboard.DrawTargetMarker(position)
+
+	//	Draw a circle showing the accuracy radius around the clicked point
+	accuracyRadius := model.GetAccuracyRadius()
+	dartboard.DrawAccuracyCircle(position, accuracyRadius)
+
+	throwCount = 0
+	throwTotal = 0
+	for i := 0; i < ThrowsAtOneTarget; i++ {
+		//	Get a modeled hit within the accuracy
+		hit, err := accuracyModel.GetThrow(position,
+			dartboard.GetScoringRadiusPixels(),
+			dartboard.GetSquareDimension(),
+			dartboard.GetImageMinPoint())
+		if err != nil {
+			fmt.Printf("Error getting throw %v", err)
+			return
+		}
+		//fmt.Printf("Hit: %#v \n", hit)
+
+		//	Draw the hit within this circle
+		dartboard.AddHitMarker(hit, multipleHitMarkerRadius)
+
+		//	Calculate the hit score
+		_, score, _ := boardgeo.DescribeBoardPoint(hit)
+		throwCount++
+		throwTotal += int64(score)
+		throwAverage = float64(throwTotal) / float64(throwCount)
+		g.Update()
+	}
 
 }
