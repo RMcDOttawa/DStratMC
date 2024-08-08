@@ -22,7 +22,7 @@ const LeftToolbarMinimumWidth = 200
 const singleHitMarkerRadius = 5
 const multipleHitMarkerRadius = 2
 
-const ThrowsAtOneTarget = 10_000
+const ThrowsAtOneTarget = 1_000
 
 var accuracyModel simulation.AccuracyModel
 var DartboardTexture *g.Texture
@@ -40,6 +40,7 @@ var messageDisplay string
 var throwTotal int64
 var throwCount int64
 var throwAverage float64
+var numThrowsField int32 = ThrowsAtOneTarget
 
 func MainUiLoop() {
 	window := g.SingleWindow()
@@ -68,16 +69,30 @@ func MainUiLoop() {
 	//fmt.Printf("image min %d, max %d\n", imageMin, imageMax)
 
 	dartboard.SetInfo(window, DartboardTexture, squareDimension, dartboardImageMin, dartboardImageMax)
+	const numThrowsTextWidth = 120
 
 	window.Layout(
 		g.RadioButton("One Exact", radioValue == RadioExactScore).OnChange(func() { radioValue = RadioExactScore; radioChanged() }),
-		g.RadioButton("One Statistical", radioValue == RadioOneAvgScore).OnChange(func() { radioValue = RadioOneAvgScore; radioChanged() }),
-		g.RadioButton("Group Statistical", radioValue == RadioGroupAvgScore).OnChange(func() { radioValue = RadioGroupAvgScore; radioChanged() }),
+		g.RadioButton("One Model Uniform", radioValue == RadioOneAvgScore).OnChange(func() { radioValue = RadioOneAvgScore; radioChanged() }),
+		g.RadioButton("Group Model Uniform", radioValue == RadioGroupAvgScore).OnChange(func() { radioValue = RadioGroupAvgScore; radioChanged() }),
 		g.Label(""),
 		g.Button("Reset").OnClick(radioChanged),
+		g.Condition(messageDisplay != "" || scoreDisplay != "",
+			g.Layout{
+				g.Label(""),
+				g.Label(messageDisplay),
+				g.Label(scoreDisplay),
+			}, nil),
+		g.Condition(radioValue == RadioGroupAvgScore,
+			g.Layout{
+				g.Label(""),
+				g.InputInt(&numThrowsField).Label("# Throws").
+					Size(numThrowsTextWidth).
+					StepSize(1).
+					StepSizeFast(100),
+			}, nil),
 		g.Label(""),
-		g.Label(messageDisplay),
-		g.Label(scoreDisplay),
+		g.Custom(dartboard.DrawFunction),
 		g.Condition(throwCount > 0,
 			g.Layout{
 				g.Label(""),
@@ -169,7 +184,7 @@ func multipleStatisticalThrows(dartboard Dartboard, position boardgeo.BoardPosit
 
 	throwCount = 0
 	throwTotal = 0
-	for i := 0; i < ThrowsAtOneTarget; i++ {
+	for i := 0; i < int(numThrowsField); i++ {
 		//	Get a modeled hit within the accuracy
 		hit, err := accuracyModel.GetThrow(position,
 			dartboard.GetScoringRadiusPixels(),
