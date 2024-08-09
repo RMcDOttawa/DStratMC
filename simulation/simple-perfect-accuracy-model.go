@@ -11,6 +11,11 @@ import (
 type PerfectAccuracyModel struct {
 }
 
+func (p PerfectAccuracyModel) GetSigmaRadius(_ float64) float64 {
+	panic("GetSigmaRadius not meaningful for perfect-accuracy model")
+	return 0
+}
+
 func (p PerfectAccuracyModel) GetAccuracyRadius() float64 {
 	panic("should not have beeen called")
 }

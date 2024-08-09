@@ -41,3 +41,8 @@ func (p UniformAccuracyModel) GetThrow(target boardgeo.BoardPosition,
 	result := boardgeo.CreateBoardPositionFromXY(point, squareDimension, startPoint)
 	return result, nil
 }
+
+func (p UniformAccuracyModel) GetSigmaRadius(_ float64) float64 {
+	panic("GetSigmaRadius not meaningful for uniform model")
+	return 0
+}

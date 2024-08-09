@@ -178,9 +178,9 @@ func GetContrastingColour(colour int) (uint8, uint8, uint8) {
 	case Board_Colour_White:
 		return 50, 50, 50
 	case Board_Colour_Red:
-		return 56, 240, 140
+		return 10, 128, 36
 	case Board_Colour_Green:
-		return 240, 112, 249
+		return 247, 33, 89
 	}
 	return 0, 0, 0
 }

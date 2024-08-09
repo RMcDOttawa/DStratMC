@@ -15,4 +15,5 @@ type AccuracyModel interface {
 		squareDimension float64,
 		startPoint image.Point) (boardgeo.BoardPosition, error)
 	GetAccuracyRadius() float64
+	GetSigmaRadius(numSigmas float64) float64
 }

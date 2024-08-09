@@ -17,6 +17,7 @@ type Dartboard interface {
 	RemoveThrowMarkers()
 	QueueTargetMarker(position boardgeo.BoardPosition)
 	QueueAccuracyCircle(position boardgeo.BoardPosition, radius float64)
+	QueueStdDeviationCircle(position boardgeo.BoardPosition, radius float64)
 	GetScoringRadiusPixels() float64
 	GetImageMinPoint() image.Point
 	GetSquareDimension() float64
@@ -44,10 +45,14 @@ type DartboardInstance struct {
 	// We have drawn a marker showing where a throw was targeted
 	targetDrawn    bool
 	targetPosition boardgeo.BoardPosition
-	// We have drawn a circle showing the accuracy radius around a clicked point
-	accuracyDrawn    bool
-	accuracyPosition boardgeo.BoardPosition
-	accuracyRadius   float64
+	// Circle showing the uniform accuracy radius around a clicked point
+	drawAccuracyCircle     bool
+	accuracyCircleRadius   float64
+	accuracyCirclePosition boardgeo.BoardPosition
+
+	// Zero or more circles showing the standard deviation radii around a clicked point
+	stdDevCirclePositions []boardgeo.BoardPosition
+	stdDevCircleRadii     []float64
 	// Slice of zero or more hits resulting from modeled throw
 	hitPositions    []boardgeo.BoardPosition
 	hitMarkerRadius int
@@ -61,10 +66,12 @@ func (d *DartboardInstance) AllocateHitsSpace(numHits int) {
 
 func NewDartboard(clickCallback func(dartboard Dartboard, position boardgeo.BoardPosition)) Dartboard {
 	instance := &DartboardInstance{
-		clickCallback: clickCallback,
-		targetDrawn:   false,
-		accuracyDrawn: false,
-		hitPositions:  make([]boardgeo.BoardPosition, 0, ThrowsAtOneTarget),
+		clickCallback:         clickCallback,
+		targetDrawn:           false,
+		drawAccuracyCircle:    false,
+		stdDevCirclePositions: make([]boardgeo.BoardPosition, 0, 3),
+		stdDevCircleRadii:     make([]float64, 0, 3),
+		hitPositions:          make([]boardgeo.BoardPosition, 0, ThrowsAtOneTarget),
 	}
 	return instance
 }
@@ -100,9 +107,10 @@ func (d *DartboardInstance) SetClickCallback(callback func(dartboard Dartboard, 
 
 func (d *DartboardInstance) RemoveThrowMarkers() {
 	d.targetDrawn = false
-	d.accuracyDrawn = false
+	d.drawAccuracyCircle = false
+	d.stdDevCirclePositions = make([]boardgeo.BoardPosition, 0, 3)
+	d.stdDevCircleRadii = make([]float64, 0, 3)
 	d.hitPositions = make([]boardgeo.BoardPosition, 0, ThrowsAtOneTarget)
-	//fmt.Println("RemoveThrowMarkers STUB")
 }
 
 func (d *DartboardInstance) DrawFunction() {
@@ -137,10 +145,8 @@ func (d *DartboardInstance) DrawFunction() {
 		d.DrawQueuedTargetMarker(canvas)
 	}
 
-	//	If we have an accuracy circle to draw, do that
-	if d.accuracyDrawn {
-		d.DrawQueuedAccuracyCircle(canvas)
-	}
+	d.drawQueuedAccuracyCircle(canvas)
+	d.drawStdDeviationCircles(canvas)
 
 	d.drawQueuedHitMarkers()
 }
@@ -150,10 +156,10 @@ func (d *DartboardInstance) DrawFunction() {
 func (d *DartboardInstance) drawReferenceLinesOnDartboard(canvas *g.Canvas) {
 	xCentre := (d.imageMin.X + d.imageMax.X) / 2
 	yCentre := (d.imageMin.Y + d.imageMax.Y) / 2
-	testCirclePosition := image.Pt(xCentre, yCentre)
-	testCircleColour := color.RGBA{R: 0, G: 0, B: 255, A: 128}
-	radius := float32(d.squareDimension / 8.0)
-	canvas.AddCircle(testCirclePosition, radius, testCircleColour, 0, 1)
+	//testCirclePosition := image.Pt(xCentre, yCentre)
+	//testCircleColour := color.RGBA{R: 0, G: 0, B: 255, A: 128}
+	//radius := float32(d.squareDimension / 8.0)
+	//canvas.AddCircle(testCirclePosition, radius, testCircleColour, 0, 1)
 
 	//	And add centred vertical and horizontal lines to help calibrate angle measurement
 	crossHairColour := color.RGBA{R: 150, G: 150, B: 150, A: 255}
@@ -220,19 +226,38 @@ func contrastingColourForPosition(position boardgeo.BoardPosition) (uint8, uint8
 }
 
 // QueueAccuracyCircle records the coordinates of a circle that will be drawn on the next UI loop pass
+// marking the defined uniform accuracy circle
 func (d *DartboardInstance) QueueAccuracyCircle(position boardgeo.BoardPosition, radius float64) {
-	d.accuracyDrawn = true
-	d.accuracyRadius = radius
-	d.accuracyPosition = position
+	d.accuracyCircleRadius = radius
+	d.accuracyCirclePosition = position
+	d.drawAccuracyCircle = true
 }
 
-// DrawQueuedAccuracyCircle draws the accuracy circle that has been recorded
-func (d *DartboardInstance) DrawQueuedAccuracyCircle(canvas *g.Canvas) {
-	xCentre, yCentre := boardgeo.GetDrawingXY(d.accuracyPosition)
+// drawStdDeviationCircles draws the standard deviation circles that have been recorded
+func (d *DartboardInstance) drawQueuedAccuracyCircle(canvas *g.Canvas) {
+	xCentre, yCentre := boardgeo.GetDrawingXY(d.accuracyCirclePosition)
 	accuracyCirclePosition := image.Pt(xCentre+d.imageMin.X, yCentre+d.imageMin.Y)
-	drawRadius := d.accuracyRadius * d.squareDimension * boardgeo.ScoringAreaFraction / 2
-	//drawRadius := 1 * d.squareDimension * boardgeo.ScoringAreaFraction / 2
+	drawRadius := d.accuracyCircleRadius * d.squareDimension * boardgeo.ScoringAreaFraction / 2
 	canvas.AddCircle(accuracyCirclePosition, float32(drawRadius), accuracyCircleColour, 0, accuracyCircleThickness)
+}
+
+// QueueStdDeviationCircle records the coordinates of a circle that will be drawn on the next UI loop pass
+// marking one of the standard deviation radii from the centre
+func (d *DartboardInstance) QueueStdDeviationCircle(position boardgeo.BoardPosition, radius float64) {
+	d.stdDevCircleRadii = append(d.stdDevCircleRadii, radius)
+	d.stdDevCirclePositions = append(d.stdDevCirclePositions, position)
+}
+
+// drawStdDeviationCircles draws the standard deviation circles that have been recorded
+func (d *DartboardInstance) drawStdDeviationCircles(canvas *g.Canvas) {
+	for i := 0; i < len(d.stdDevCirclePositions); i++ {
+		stdDevPosition := d.stdDevCirclePositions[i]
+		stdDevRadius := d.stdDevCircleRadii[i]
+		xCentre, yCentre := boardgeo.GetDrawingXY(stdDevPosition)
+		circlePosition := image.Pt(xCentre+d.imageMin.X, yCentre+d.imageMin.Y)
+		drawRadius := stdDevRadius * d.squareDimension * boardgeo.ScoringAreaFraction / 2
+		canvas.AddCircle(circlePosition, float32(drawRadius), accuracyCircleColour, 0, accuracyCircleThickness)
+	}
 }
 
 // QueueHitMarker records the position of a throw hit in a list (there may be many). The queued markers will be drawn

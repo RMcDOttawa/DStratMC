@@ -11,9 +11,11 @@ import (
 )
 
 const (
-	RadioExactScore = iota
-	RadioOneAvgScore
-	RadioGroupAvgScore
+	RadioExact = iota
+	RadioOneAvg
+	RadioMultiAvg
+	RadioOneNormal
+	RadioMultiNormal
 )
 
 const LeftToolbarMinimumWidth = 200
@@ -22,6 +24,10 @@ const multipleHitMarkerRadius = 1
 
 const ThrowsAtOneTarget = 1_000
 const numThrowsTextWidth = 120
+
+const uniformCEPRadius = 0.3
+const normalCEPRadius = 0.25
+const stubStandardDeviation = normalCEPRadius * 2
 
 var radioValue int
 var DartboardTexture *g.Texture
@@ -33,10 +39,10 @@ var throwTotal int64
 var throwCount int64
 var throwAverage float64
 var numThrowsField int32 = ThrowsAtOneTarget
-var drawReferenceLinesCheckbox = false
+var drawReferenceLinesCheckbox = true
 
 func UserInterfaceSetup(loadedImage *image.RGBA) {
-	radioValue = RadioOneAvgScore
+	radioValue = RadioOneNormal
 	g.EnqueueNewTextureFromRgba(loadedImage, func(t *g.Texture) {
 		DartboardTexture = t
 	})
@@ -62,9 +68,11 @@ func leftToolbarLayout() g.Widget {
 
 		// Radio buttons to select the type of interaction and model
 		g.Label(""),
-		g.RadioButton("One Exact", radioValue == RadioExactScore).OnChange(func() { radioValue = RadioExactScore; AccuracyModel = getAccuracyModel(radioValue); radioChanged() }),
-		g.RadioButton("One Model Uniform", radioValue == RadioOneAvgScore).OnChange(func() { radioValue = RadioOneAvgScore; AccuracyModel = getAccuracyModel(radioValue); radioChanged() }),
-		g.RadioButton("Group Model Uniform", radioValue == RadioGroupAvgScore).OnChange(func() { radioValue = RadioGroupAvgScore; AccuracyModel = getAccuracyModel(radioValue); radioChanged() }),
+		g.RadioButton("One Exact", radioValue == RadioExact).OnChange(func() { radioValue = RadioExact; AccuracyModel = getAccuracyModel(radioValue); radioChanged() }),
+		g.RadioButton("One Throw Uniform", radioValue == RadioOneAvg).OnChange(func() { radioValue = RadioOneAvg; AccuracyModel = getAccuracyModel(radioValue); radioChanged() }),
+		g.RadioButton("Multi Throw Uniform", radioValue == RadioMultiAvg).OnChange(func() { radioValue = RadioMultiAvg; AccuracyModel = getAccuracyModel(radioValue); radioChanged() }),
+		g.RadioButton("One Throw Normal", radioValue == RadioOneNormal).OnChange(func() { radioValue = RadioOneNormal; AccuracyModel = getAccuracyModel(radioValue); radioChanged() }),
+		g.RadioButton("Multi Throw Normal", radioValue == RadioMultiNormal).OnChange(func() { radioValue = RadioMultiNormal; AccuracyModel = getAccuracyModel(radioValue); radioChanged() }),
 
 		// A reset button resets counters and displays
 		g.Label(""),
@@ -79,7 +87,7 @@ func leftToolbarLayout() g.Widget {
 			}, nil),
 
 		// If we are doing multiple throws, allow the user to set the number of throws
-		g.Condition(radioValue == RadioGroupAvgScore,
+		g.Condition(radioValue == RadioMultiAvg || radioValue == RadioMultiNormal,
 			g.Layout{
 				g.Label(""),
 				g.InputInt(&numThrowsField).Label("# Throws").
@@ -103,14 +111,18 @@ func leftToolbarLayout() g.Widget {
 
 func getAccuracyModel(radioValue int) simulation.AccuracyModel {
 	switch radioValue {
-	case RadioExactScore:
+	case RadioExact:
 		return nil
-	case RadioOneAvgScore:
-		return simulation.NewUniformAccuracyModel(0.3)
-	case RadioGroupAvgScore:
-		return simulation.NewUniformAccuracyModel(0.3)
+	case RadioOneAvg:
+		return simulation.NewUniformAccuracyModel(uniformCEPRadius)
+	case RadioMultiAvg:
+		return simulation.NewUniformAccuracyModel(uniformCEPRadius)
+	case RadioOneNormal:
+		return simulation.NewNormalAccuracyModel(normalCEPRadius, stubStandardDeviation)
+	case RadioMultiNormal:
+		return simulation.NewNormalAccuracyModel(normalCEPRadius, stubStandardDeviation)
 	default:
-		fmt.Println("Invalid radio button value")
+		panic("Invalid radio button value")
 		return simulation.NewPerfectAccuracyModel()
 	}
 }
@@ -160,24 +172,28 @@ func dartboardClickCallback(dartboard Dartboard, position boardgeo.BoardPosition
 		messageDisplay = ""
 		scoreDisplay = ""
 		dartboard.RemoveThrowMarkers()
-		if radioValue == RadioExactScore {
-			//markHitPoint(polarRadius, thetaDegrees)
+		switch radioValue {
+		case RadioExact:
 			dartboard.QueueTargetMarker(position)
 			_, score, description := boardgeo.DescribeBoardPoint(position)
 			messageDisplay = description
 			scoreDisplay = strconv.Itoa(score) + " points"
-		} else if radioValue == RadioOneAvgScore {
-			oneStatisticalThrow(dartboard, position, AccuracyModel)
-		} else if radioValue == RadioGroupAvgScore {
-			multipleStatisticalThrows(dartboard, position, AccuracyModel)
-		} else {
-			fmt.Println("Invalid radio button value")
+		case RadioOneAvg:
+			oneUniformThrow(dartboard, position, AccuracyModel)
+		case RadioMultiAvg:
+			multipleUniformThrows(dartboard, position, AccuracyModel)
+		case RadioOneNormal:
+			oneNormalThrow(dartboard, position, AccuracyModel)
+		case RadioMultiNormal:
+			multipleNormalThrows(dartboard, position, AccuracyModel)
+		default:
+			panic("Invalid radio button value")
 		}
 	}
 }
 
-func oneStatisticalThrow(dartboard Dartboard, position boardgeo.BoardPosition, model simulation.AccuracyModel) {
-	//fmt.Printf("oneStatisticalThrow  %v,\n", position)
+func oneUniformThrow(dartboard Dartboard, position boardgeo.BoardPosition, model simulation.AccuracyModel) {
+	//fmt.Printf("oneUniformThrow  %v,\n", position)
 
 	//  Draw a marker to record where we clicked
 	dartboard.QueueTargetMarker(position)
@@ -211,8 +227,8 @@ func oneStatisticalThrow(dartboard Dartboard, position boardgeo.BoardPosition, m
 
 }
 
-func multipleStatisticalThrows(dartboard Dartboard, position boardgeo.BoardPosition, model simulation.AccuracyModel) {
-	//fmt.Printf("multipleStatisticalThrows  %v,\n", position)
+func multipleUniformThrows(dartboard Dartboard, position boardgeo.BoardPosition, model simulation.AccuracyModel) {
+	//fmt.Printf("multipleUniformThrows  %v,\n", position)
 
 	//  Draw a marker to record where we clicked
 	dartboard.QueueTargetMarker(position)
@@ -241,6 +257,90 @@ func multipleStatisticalThrows(dartboard Dartboard, position boardgeo.BoardPosit
 
 		//	Calculate the hit score
 		_, score, _ := boardgeo.DescribeBoardPoint(hit)
+		throwCount++
+		throwTotal += int64(score)
+		throwAverage = float64(throwTotal) / float64(throwCount)
+	}
+	g.Update()
+
+}
+
+func oneNormalThrow(dartboard Dartboard, position boardgeo.BoardPosition, model simulation.AccuracyModel) {
+	//fmt.Printf("oneNormalThrow  %v,\n", position)
+
+	//  Draw a marker to record where we clicked
+	dartboard.QueueTargetMarker(position)
+
+	//	Draw circles showing requested sigma levels around the clicked point
+	oneSigmaRadius := model.GetSigmaRadius(1)
+	dartboard.QueueStdDeviationCircle(position, oneSigmaRadius)
+	twoSigmaRadius := model.GetSigmaRadius(2)
+	dartboard.QueueStdDeviationCircle(position, twoSigmaRadius)
+	threeSigmaRadius := model.GetSigmaRadius(3)
+	dartboard.QueueStdDeviationCircle(position, threeSigmaRadius)
+
+	//	Get a modeled hit within the accuracy
+	hit, err := model.GetThrow(position,
+		dartboard.GetScoringRadiusPixels(),
+		dartboard.GetSquareDimension(),
+		dartboard.GetImageMinPoint())
+	if err != nil {
+		fmt.Printf("Error getting throw %v", err)
+		return
+	}
+	//fmt.Printf("Hit: %#v \n", hit)
+
+	//	Draw the hit within this circle
+	dartboard.QueueHitMarker(hit, singleHitMarkerRadius)
+
+	//	Calculate the hit score
+	_, score, description := boardgeo.DescribeBoardPoint(hit)
+	messageDisplay = description
+	scoreDisplay = strconv.Itoa(score) + " points"
+	throwCount++
+	throwTotal += int64(score)
+	throwAverage = float64(throwTotal) / float64(throwCount)
+	g.Update()
+
+}
+
+func multipleNormalThrows(dartboard Dartboard, position boardgeo.BoardPosition, model simulation.AccuracyModel) {
+	//fmt.Printf("oneNormalThrow  %v,\n", position)
+
+	//  Draw a marker to record where we clicked
+	dartboard.QueueTargetMarker(position)
+
+	//	Draw circles showing requested sigma levels around the clicked point
+	oneSigmaRadius := model.GetSigmaRadius(1)
+	dartboard.QueueStdDeviationCircle(position, oneSigmaRadius)
+	twoSigmaRadius := model.GetSigmaRadius(2)
+	dartboard.QueueStdDeviationCircle(position, twoSigmaRadius)
+	threeSigmaRadius := model.GetSigmaRadius(3)
+	dartboard.QueueStdDeviationCircle(position, threeSigmaRadius)
+	dartboard.AllocateHitsSpace(int(numThrowsField))
+
+	throwCount = 0
+	throwTotal = 0
+
+	for i := 0; i < int(numThrowsField); i++ {
+		//	Get a modeled hit within the accuracy
+		hit, err := model.GetThrow(position,
+			dartboard.GetScoringRadiusPixels(),
+			dartboard.GetSquareDimension(),
+			dartboard.GetImageMinPoint())
+		if err != nil {
+			fmt.Printf("Error getting throw %v", err)
+			return
+		}
+		//fmt.Printf("Hit: %#v \n", hit)
+
+		//	Draw the hit within this circle
+		dartboard.QueueHitMarker(hit, multipleHitMarkerRadius)
+
+		//	Calculate the hit score
+		_, score, description := boardgeo.DescribeBoardPoint(hit)
+		messageDisplay = description
+		scoreDisplay = strconv.Itoa(score) + " points"
 		throwCount++
 		throwTotal += int64(score)
 		throwAverage = float64(throwTotal) / float64(throwCount)
