@@ -33,6 +33,7 @@ var throwTotal int64
 var throwCount int64
 var throwAverage float64
 var numThrowsField int32 = ThrowsAtOneTarget
+var drawReferenceLinesCheckbox = false
 
 func UserInterfaceSetup(loadedImage *image.RGBA) {
 	radioValue = RadioOneAvgScore
@@ -40,6 +41,7 @@ func UserInterfaceSetup(loadedImage *image.RGBA) {
 		DartboardTexture = t
 	})
 	dartboard = NewDartboard(dartboardClickCallback)
+	dartboard.SetDrawRefLines(drawReferenceLinesCheckbox)
 }
 
 func MainUiLoop() {
@@ -55,8 +57,11 @@ func MainUiLoop() {
 func leftToolbarLayout() g.Widget {
 	AccuracyModel = getAccuracyModel(radioValue)
 	return g.Layout{
+		//	Checkbox controlling whether crosshairs are drawn
+		g.Checkbox("Reference Lines", &drawReferenceLinesCheckbox).OnChange(func() { dartboard.SetDrawRefLines(drawReferenceLinesCheckbox) }),
 
 		// Radio buttons to select the type of interaction and model
+		g.Label(""),
 		g.RadioButton("One Exact", radioValue == RadioExactScore).OnChange(func() { radioValue = RadioExactScore; AccuracyModel = getAccuracyModel(radioValue); radioChanged() }),
 		g.RadioButton("One Model Uniform", radioValue == RadioOneAvgScore).OnChange(func() { radioValue = RadioOneAvgScore; AccuracyModel = getAccuracyModel(radioValue); radioChanged() }),
 		g.RadioButton("Group Model Uniform", radioValue == RadioGroupAvgScore).OnChange(func() { radioValue = RadioGroupAvgScore; AccuracyModel = getAccuracyModel(radioValue); radioChanged() }),
@@ -101,9 +106,9 @@ func getAccuracyModel(radioValue int) simulation.AccuracyModel {
 	case RadioExactScore:
 		return nil
 	case RadioOneAvgScore:
-		return simulation.NewCircularAccuracyModel(0.3)
+		return simulation.NewUniformAccuracyModel(0.3)
 	case RadioGroupAvgScore:
-		return simulation.NewCircularAccuracyModel(0.3)
+		return simulation.NewUniformAccuracyModel(0.3)
 	default:
 		fmt.Println("Invalid radio button value")
 		return simulation.NewPerfectAccuracyModel()
@@ -157,7 +162,7 @@ func dartboardClickCallback(dartboard Dartboard, position boardgeo.BoardPosition
 		dartboard.RemoveThrowMarkers()
 		if radioValue == RadioExactScore {
 			//markHitPoint(polarRadius, thetaDegrees)
-			dartboard.DrawTargetMarker(position)
+			dartboard.QueueTargetMarker(position)
 			_, score, description := boardgeo.DescribeBoardPoint(position)
 			messageDisplay = description
 			scoreDisplay = strconv.Itoa(score) + " points"
@@ -175,11 +180,11 @@ func oneStatisticalThrow(dartboard Dartboard, position boardgeo.BoardPosition, m
 	//fmt.Printf("oneStatisticalThrow  %v,\n", position)
 
 	//  Draw a marker to record where we clicked
-	dartboard.DrawTargetMarker(position)
+	dartboard.QueueTargetMarker(position)
 
 	//	Draw a circle showing the accuracy radius around the clicked point
 	accuracyRadius := model.GetAccuracyRadius()
-	dartboard.DrawAccuracyCircle(position, accuracyRadius)
+	dartboard.QueueAccuracyCircle(position, accuracyRadius)
 
 	//	Get a modeled hit within the accuracy
 	hit, err := model.GetThrow(position,
@@ -193,7 +198,7 @@ func oneStatisticalThrow(dartboard Dartboard, position boardgeo.BoardPosition, m
 	//fmt.Printf("Hit: %#v \n", hit)
 
 	//	Draw the hit within this circle
-	dartboard.AddHitMarker(hit, singleHitMarkerRadius)
+	dartboard.QueueHitMarker(hit, singleHitMarkerRadius)
 
 	//	Calculate the hit score
 	_, score, description := boardgeo.DescribeBoardPoint(hit)
@@ -210,11 +215,11 @@ func multipleStatisticalThrows(dartboard Dartboard, position boardgeo.BoardPosit
 	//fmt.Printf("multipleStatisticalThrows  %v,\n", position)
 
 	//  Draw a marker to record where we clicked
-	dartboard.DrawTargetMarker(position)
+	dartboard.QueueTargetMarker(position)
 
 	//	Draw a circle showing the accuracy radius around the clicked point
 	accuracyRadius := model.GetAccuracyRadius()
-	dartboard.DrawAccuracyCircle(position, accuracyRadius)
+	dartboard.QueueAccuracyCircle(position, accuracyRadius)
 	dartboard.AllocateHitsSpace(int(numThrowsField))
 
 	throwCount = 0
@@ -232,7 +237,7 @@ func multipleStatisticalThrows(dartboard Dartboard, position boardgeo.BoardPosit
 		//fmt.Printf("Hit: %#v \n", hit)
 
 		//	Draw the hit within this circle
-		dartboard.AddHitMarker(hit, multipleHitMarkerRadius)
+		dartboard.QueueHitMarker(hit, multipleHitMarkerRadius)
 
 		//	Calculate the hit score
 		_, score, _ := boardgeo.DescribeBoardPoint(hit)

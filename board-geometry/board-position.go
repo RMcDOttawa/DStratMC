@@ -6,17 +6,14 @@ import (
 	"strconv"
 )
 
+// BoardPosition represents a point on the dartboard - either where we aimed, or where we hit
+// We record it both in terms of the mouse position (x,y) inside the frame,
+// and in a normalized polar coordinate system
 type BoardPosition struct {
 	XMouseInside int
 	YMouseInside int
-	//XMouseZeroCentered int
-	//YMouseZeroCentered int
-	//XFractionBoard     float64
-	//YFractionBoard     float64
-	//XFractionScoring   float64
-	//YFractionScoring   float64
-	Radius float64 // 0 (centre) to 1.0 (outer edge of scoring area) or larger for outside
-	Angle  float64 // Degrees, clockwise from 0 being straight up
+	Radius       float64 // 0 (centre) to 1.0 (outer edge of scoring area) or larger for outside
+	Angle        float64 // Degrees, clockwise from 0 being straight up
 }
 
 // enum to represent the various scoring areas on the board
@@ -89,6 +86,9 @@ func DescribeBoardPoint(point BoardPosition) (int, int, string) {
 	return segment, score, asString
 }
 
+// GetColourForSegment tells what colour the dartboard segment provided is.  This is not used for drawing -
+// we are using a pre-drawn image to display the dartboard. It is used to calculate a contrasting colour for
+// markers of various kinds that are displayed on top of the dartboard.
 func GetColourForSegment(segment int, score int) int {
 	if segment == BoardArea_InnerSingle || segment == BoardArea_OuterSingle || segment == BoardArea_Out {
 		return colourForSingle(score)
@@ -163,7 +163,10 @@ func colourForSingle(score int) int {
 	return singleSegmentColours[score-1]
 }
 
-func GetContrastingColour(colour int) (int, int, int) {
+// GetContrastingColour returns a contrasting colour for the given colour.  This is used to make sure that
+// text and other markers are visible on the board, regardless of the colour of the segment they are on.
+// The colour is returned as 3
+func GetContrastingColour(colour int) (uint8, uint8, uint8) {
 	switch colour {
 	case Board_Colour_Black:
 		return 220, 220, 220
