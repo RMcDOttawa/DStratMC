@@ -90,7 +90,9 @@ func DescribeBoardPoint(point BoardPosition) (int, int, string) {
 // we are using a pre-drawn image to display the dartboard. It is used to calculate a contrasting colour for
 // markers of various kinds that are displayed on top of the dartboard.
 func GetColourForSegment(segment int, score int) int {
-	if segment == BoardArea_InnerSingle || segment == BoardArea_OuterSingle || segment == BoardArea_Out {
+	if segment == BoardArea_Out {
+		return Board_Colour_Black
+	} else if segment == BoardArea_InnerSingle || segment == BoardArea_OuterSingle {
 		return colourForSingle(score)
 	} else if segment == BoardArea_Double {
 		return colourForDouble(score)
@@ -160,6 +162,9 @@ var singleSegmentColours = []int{
 }
 
 func colourForSingle(score int) int {
+	if score < 1 || score > 20 {
+		panic("colourForSingle received Invalid single score: " + strconv.Itoa(score))
+	}
 	return singleSegmentColours[score-1]
 }
 
