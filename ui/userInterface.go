@@ -16,8 +16,6 @@ const (
 	RadioGroupAvgScore
 )
 
-var radioValue int
-
 const LeftToolbarMinimumWidth = 200
 const singleHitMarkerRadius = 5
 const multipleHitMarkerRadius = 1
@@ -25,23 +23,24 @@ const multipleHitMarkerRadius = 1
 const ThrowsAtOneTarget = 1_000
 const numThrowsTextWidth = 120
 
-var accuracyModel simulation.AccuracyModel
+var radioValue int
 var DartboardTexture *g.Texture
 var dartboard Dartboard
-
-func UserInterfaceSetup(theAccuracyModel simulation.AccuracyModel) {
-	accuracyModel = theAccuracyModel
-	radioValue = RadioOneAvgScore
-	dartboard = NewDartboard(dartboardClickCallback)
-}
-
+var AccuracyModel simulation.AccuracyModel
 var scoreDisplay string
 var messageDisplay string
-
 var throwTotal int64
 var throwCount int64
 var throwAverage float64
 var numThrowsField int32 = ThrowsAtOneTarget
+
+func UserInterfaceSetup(loadedImage *image.RGBA) {
+	radioValue = RadioOneAvgScore
+	g.EnqueueNewTextureFromRgba(loadedImage, func(t *g.Texture) {
+		DartboardTexture = t
+	})
+	dartboard = NewDartboard(dartboardClickCallback)
+}
 
 func MainUiLoop() {
 	window := setUpWindow()
@@ -54,12 +53,13 @@ func MainUiLoop() {
 }
 
 func leftToolbarLayout() g.Widget {
+	AccuracyModel = getAccuracyModel(radioValue)
 	return g.Layout{
 
 		// Radio buttons to select the type of interaction and model
-		g.RadioButton("One Exact", radioValue == RadioExactScore).OnChange(func() { radioValue = RadioExactScore; radioChanged() }),
-		g.RadioButton("One Model Uniform", radioValue == RadioOneAvgScore).OnChange(func() { radioValue = RadioOneAvgScore; radioChanged() }),
-		g.RadioButton("Group Model Uniform", radioValue == RadioGroupAvgScore).OnChange(func() { radioValue = RadioGroupAvgScore; radioChanged() }),
+		g.RadioButton("One Exact", radioValue == RadioExactScore).OnChange(func() { radioValue = RadioExactScore; AccuracyModel = getAccuracyModel(radioValue); radioChanged() }),
+		g.RadioButton("One Model Uniform", radioValue == RadioOneAvgScore).OnChange(func() { radioValue = RadioOneAvgScore; AccuracyModel = getAccuracyModel(radioValue); radioChanged() }),
+		g.RadioButton("Group Model Uniform", radioValue == RadioGroupAvgScore).OnChange(func() { radioValue = RadioGroupAvgScore; AccuracyModel = getAccuracyModel(radioValue); radioChanged() }),
 
 		// A reset button resets counters and displays
 		g.Label(""),
@@ -94,6 +94,20 @@ func leftToolbarLayout() g.Widget {
 			nil),
 	}
 
+}
+
+func getAccuracyModel(radioValue int) simulation.AccuracyModel {
+	switch radioValue {
+	case RadioExactScore:
+		return nil
+	case RadioOneAvgScore:
+		return simulation.NewCircularAccuracyModel(0.3)
+	case RadioGroupAvgScore:
+		return simulation.NewCircularAccuracyModel(0.3)
+	default:
+		fmt.Println("Invalid radio button value")
+		return simulation.NewPerfectAccuracyModel()
+	}
 }
 
 func setUpWindow() *g.WindowWidget {
@@ -148,9 +162,9 @@ func dartboardClickCallback(dartboard Dartboard, position boardgeo.BoardPosition
 			messageDisplay = description
 			scoreDisplay = strconv.Itoa(score) + " points"
 		} else if radioValue == RadioOneAvgScore {
-			oneStatisticalThrow(dartboard, position, accuracyModel)
+			oneStatisticalThrow(dartboard, position, AccuracyModel)
 		} else if radioValue == RadioGroupAvgScore {
-			multipleStatisticalThrows(dartboard, position, accuracyModel)
+			multipleStatisticalThrows(dartboard, position, AccuracyModel)
 		} else {
 			fmt.Println("Invalid radio button value")
 		}
@@ -168,7 +182,7 @@ func oneStatisticalThrow(dartboard Dartboard, position boardgeo.BoardPosition, m
 	dartboard.DrawAccuracyCircle(position, accuracyRadius)
 
 	//	Get a modeled hit within the accuracy
-	hit, err := accuracyModel.GetThrow(position,
+	hit, err := model.GetThrow(position,
 		dartboard.GetScoringRadiusPixels(),
 		dartboard.GetSquareDimension(),
 		dartboard.GetImageMinPoint())
@@ -207,7 +221,7 @@ func multipleStatisticalThrows(dartboard Dartboard, position boardgeo.BoardPosit
 	throwTotal = 0
 	for i := 0; i < int(numThrowsField); i++ {
 		//	Get a modeled hit within the accuracy
-		hit, err := accuracyModel.GetThrow(position,
+		hit, err := model.GetThrow(position,
 			dartboard.GetScoringRadiusPixels(),
 			dartboard.GetSquareDimension(),
 			dartboard.GetImageMinPoint())
