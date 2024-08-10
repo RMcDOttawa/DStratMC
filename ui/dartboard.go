@@ -2,6 +2,7 @@ package ui
 
 import (
 	boardgeo "DStratMC/board-geometry"
+	"fmt"
 	g "github.com/AllenDang/giu"
 	"image"
 	"image/color"
@@ -17,7 +18,7 @@ type Dartboard interface {
 	RemoveThrowMarkers()
 	QueueTargetMarker(position boardgeo.BoardPosition)
 	QueueAccuracyCircle(position boardgeo.BoardPosition, radius float64)
-	QueueStdDeviationCircle(position boardgeo.BoardPosition, radius float64)
+	QueueStdDeviationCircle(position boardgeo.BoardPosition, multiplier float64, radius float64)
 	GetScoringRadiusPixels() float64
 	GetImageMinPoint() image.Point
 	GetSquareDimension() float64
@@ -42,20 +43,25 @@ type DartboardInstance struct {
 	imageMin        image.Point
 	imageMax        image.Point
 	clickCallback   func(dartboard Dartboard, position boardgeo.BoardPosition)
+
 	// We have drawn a marker showing where a throw was targeted
 	targetDrawn    bool
 	targetPosition boardgeo.BoardPosition
+
 	// Circle showing the uniform accuracy radius around a clicked point
 	drawAccuracyCircle     bool
 	accuracyCircleRadius   float64
 	accuracyCirclePosition boardgeo.BoardPosition
 
 	// Zero or more circles showing the standard deviation radii around a clicked point
-	stdDevCirclePositions []boardgeo.BoardPosition
-	stdDevCircleRadii     []float64
+	stdDevCirclePositions   []boardgeo.BoardPosition
+	stdDevCircleMultipliers []float64
+	stdDevCircleRadii       []float64
+
 	// Slice of zero or more hits resulting from modeled throw
 	hitPositions    []boardgeo.BoardPosition
 	hitMarkerRadius int
+
 	// Draw the testing crosshair?
 	drawReferenceLines bool
 }
@@ -66,12 +72,13 @@ func (d *DartboardInstance) AllocateHitsSpace(numHits int) {
 
 func NewDartboard(clickCallback func(dartboard Dartboard, position boardgeo.BoardPosition)) Dartboard {
 	instance := &DartboardInstance{
-		clickCallback:         clickCallback,
-		targetDrawn:           false,
-		drawAccuracyCircle:    false,
-		stdDevCirclePositions: make([]boardgeo.BoardPosition, 0, 3),
-		stdDevCircleRadii:     make([]float64, 0, 3),
-		hitPositions:          make([]boardgeo.BoardPosition, 0, ThrowsAtOneTarget),
+		clickCallback:           clickCallback,
+		targetDrawn:             false,
+		drawAccuracyCircle:      false,
+		stdDevCirclePositions:   make([]boardgeo.BoardPosition, 0, 3),
+		stdDevCircleRadii:       make([]float64, 0, 3),
+		stdDevCircleMultipliers: make([]float64, 0, 3),
+		hitPositions:            make([]boardgeo.BoardPosition, 0, ThrowsAtOneTarget),
 	}
 	return instance
 }
@@ -110,6 +117,7 @@ func (d *DartboardInstance) RemoveThrowMarkers() {
 	d.drawAccuracyCircle = false
 	d.stdDevCirclePositions = make([]boardgeo.BoardPosition, 0, 3)
 	d.stdDevCircleRadii = make([]float64, 0, 3)
+	d.stdDevCircleMultipliers = make([]float64, 0, 3)
 	d.hitPositions = make([]boardgeo.BoardPosition, 0, ThrowsAtOneTarget)
 }
 
@@ -145,7 +153,9 @@ func (d *DartboardInstance) DrawFunction() {
 		d.DrawQueuedTargetMarker(canvas)
 	}
 
-	d.drawQueuedAccuracyCircle(canvas)
+	if d.drawAccuracyCircle {
+		d.drawQueuedAccuracyCircle(canvas)
+	}
 	d.drawStdDeviationCircles(canvas)
 
 	d.drawQueuedHitMarkers()
@@ -243,20 +253,34 @@ func (d *DartboardInstance) drawQueuedAccuracyCircle(canvas *g.Canvas) {
 
 // QueueStdDeviationCircle records the coordinates of a circle that will be drawn on the next UI loop pass
 // marking one of the standard deviation radii from the centre
-func (d *DartboardInstance) QueueStdDeviationCircle(position boardgeo.BoardPosition, radius float64) {
+func (d *DartboardInstance) QueueStdDeviationCircle(position boardgeo.BoardPosition, multiplier float64, radius float64) {
 	d.stdDevCircleRadii = append(d.stdDevCircleRadii, radius)
 	d.stdDevCirclePositions = append(d.stdDevCirclePositions, position)
+	d.stdDevCircleMultipliers = append(d.stdDevCircleMultipliers, multiplier)
 }
 
 // drawStdDeviationCircles draws the standard deviation circles that have been recorded
 func (d *DartboardInstance) drawStdDeviationCircles(canvas *g.Canvas) {
 	for i := 0; i < len(d.stdDevCirclePositions); i++ {
+		// Draw the circle for this standard deviation reference
 		stdDevPosition := d.stdDevCirclePositions[i]
 		stdDevRadius := d.stdDevCircleRadii[i]
 		xCentre, yCentre := boardgeo.GetDrawingXY(stdDevPosition)
 		circlePosition := image.Pt(xCentre+d.imageMin.X, yCentre+d.imageMin.Y)
 		drawRadius := stdDevRadius * d.squareDimension * boardgeo.ScoringAreaFraction / 2
 		canvas.AddCircle(circlePosition, float32(drawRadius), accuracyCircleColour, 0, accuracyCircleThickness)
+
+		//	Label the top of the circle with the multiplier
+		multiplier := d.stdDevCircleMultipliers[i]
+		circleLabel := fmt.Sprintf("%2g std", multiplier)
+		labelWidth, labelHeight := g.CalcTextSize(circleLabel)
+		//fmt.Printf("Label std dev circle of radius %g with multiplier %g: %s\n", stdDevRadius, multiplier, circleLabel)
+
+		labelPosition := circlePosition
+		labelPosition.X -= int(labelWidth / 2)
+		labelPosition.Y -= int(drawRadius + float64(labelHeight))
+		//fmt.Printf("  Label position %v text width %g height %g\n", circlePosition, labelWidth, labelHeight)
+		canvas.AddText(labelPosition, accuracyCircleColour, circleLabel)
 	}
 }
 

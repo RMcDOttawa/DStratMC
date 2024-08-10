@@ -41,8 +41,15 @@ var throwAverage float64
 var numThrowsField int32 = ThrowsAtOneTarget
 var drawReferenceLinesCheckbox = true
 
+var drawOneSigma bool
+var drawTwoSigma bool
+var drawThreeSigma bool
+
 func UserInterfaceSetup(loadedImage *image.RGBA) {
 	radioValue = RadioOneNormal
+	drawOneSigma = false
+	drawTwoSigma = true
+	drawThreeSigma = false
 	g.EnqueueNewTextureFromRgba(loadedImage, func(t *g.Texture) {
 		DartboardTexture = t
 	})
@@ -94,6 +101,16 @@ func leftToolbarLayout() g.Widget {
 					Size(numThrowsTextWidth).
 					StepSize(1).
 					StepSizeFast(100),
+			}, nil),
+
+		// When we are doing normal distribution (and only then) offer 3 checkboxes for drawing reference
+		// circles at 1, 2, and 3 standard deviations
+		g.Condition(radioValue == RadioOneNormal || radioValue == RadioMultiNormal,
+			g.Layout{
+				g.Label(""),
+				g.Checkbox("1 Sigma", &drawOneSigma),
+				g.Checkbox("2 Sigma", &drawTwoSigma),
+				g.Checkbox("3 Sigma", &drawThreeSigma),
 			}, nil),
 
 		// Once a number of throws have been accumulated, display the average score
@@ -272,12 +289,18 @@ func oneNormalThrow(dartboard Dartboard, position boardgeo.BoardPosition, model 
 	dartboard.QueueTargetMarker(position)
 
 	//	Draw circles showing requested sigma levels around the clicked point
-	oneSigmaRadius := model.GetSigmaRadius(1)
-	dartboard.QueueStdDeviationCircle(position, oneSigmaRadius)
-	twoSigmaRadius := model.GetSigmaRadius(2)
-	dartboard.QueueStdDeviationCircle(position, twoSigmaRadius)
-	threeSigmaRadius := model.GetSigmaRadius(3)
-	dartboard.QueueStdDeviationCircle(position, threeSigmaRadius)
+	if drawOneSigma {
+		oneSigmaRadius := model.GetSigmaRadius(1)
+		dartboard.QueueStdDeviationCircle(position, 1, oneSigmaRadius)
+	}
+	if drawTwoSigma {
+		twoSigmaRadius := model.GetSigmaRadius(2)
+		dartboard.QueueStdDeviationCircle(position, 2, twoSigmaRadius)
+	}
+	if drawThreeSigma {
+		threeSigmaRadius := model.GetSigmaRadius(3)
+		dartboard.QueueStdDeviationCircle(position, 3, threeSigmaRadius)
+	}
 
 	//	Get a modeled hit within the accuracy
 	hit, err := model.GetThrow(position,
@@ -311,12 +334,18 @@ func multipleNormalThrows(dartboard Dartboard, position boardgeo.BoardPosition, 
 	dartboard.QueueTargetMarker(position)
 
 	//	Draw circles showing requested sigma levels around the clicked point
-	oneSigmaRadius := model.GetSigmaRadius(1)
-	dartboard.QueueStdDeviationCircle(position, oneSigmaRadius)
-	twoSigmaRadius := model.GetSigmaRadius(2)
-	dartboard.QueueStdDeviationCircle(position, twoSigmaRadius)
-	threeSigmaRadius := model.GetSigmaRadius(3)
-	dartboard.QueueStdDeviationCircle(position, threeSigmaRadius)
+	if drawOneSigma {
+		oneSigmaRadius := model.GetSigmaRadius(1)
+		dartboard.QueueStdDeviationCircle(position, 1, oneSigmaRadius)
+	}
+	if drawTwoSigma {
+		twoSigmaRadius := model.GetSigmaRadius(2)
+		dartboard.QueueStdDeviationCircle(position, 2, twoSigmaRadius)
+	}
+	if drawThreeSigma {
+		threeSigmaRadius := model.GetSigmaRadius(3)
+		dartboard.QueueStdDeviationCircle(position, 3, threeSigmaRadius)
+	}
 	dartboard.AllocateHitsSpace(int(numThrowsField))
 
 	throwCount = 0
