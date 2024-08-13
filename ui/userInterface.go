@@ -22,7 +22,7 @@ const LeftToolbarMinimumWidth = 200
 const singleHitMarkerRadius = 5
 const multipleHitMarkerRadius = 1
 
-const ThrowsAtOneTarget = 1_000
+const ThrowsAtOneTarget = 5_000
 const numThrowsTextWidth = 120
 
 const uniformCEPRadius = 0.3
@@ -48,7 +48,7 @@ var drawThreeSigma bool
 func UserInterfaceSetup(loadedImage *image.RGBA) {
 	radioValue = RadioOneNormal
 	drawOneSigma = false
-	drawTwoSigma = true
+	drawTwoSigma = false
 	drawThreeSigma = false
 	g.EnqueueNewTextureFromRgba(loadedImage, func(t *g.Texture) {
 		DartboardTexture = t
@@ -61,13 +61,13 @@ func MainUiLoop() {
 	window := setUpWindow()
 
 	window.Layout(
-		leftToolbarLayout(),
+		leftToolbarLayout(dartboard),
 		g.Custom(dartboard.DrawFunction),
 	)
 
 }
 
-func leftToolbarLayout() g.Widget {
+func leftToolbarLayout(dartboard Dartboard) g.Widget {
 	AccuracyModel = getAccuracyModel(radioValue)
 	return g.Layout{
 		//	Checkbox controlling whether crosshairs are drawn
@@ -108,9 +108,9 @@ func leftToolbarLayout() g.Widget {
 		g.Condition(radioValue == RadioOneNormal || radioValue == RadioMultiNormal,
 			g.Layout{
 				g.Label(""),
-				g.Checkbox("1 Sigma", &drawOneSigma),
-				g.Checkbox("2 Sigma", &drawTwoSigma),
-				g.Checkbox("3 Sigma", &drawThreeSigma),
+				g.Checkbox("1 Sigma", &drawOneSigma).OnChange(func() { dartboard.SetDrawOneSigma(drawOneSigma, AccuracyModel.GetSigmaRadius(1)) }),
+				g.Checkbox("2 Sigma", &drawTwoSigma).OnChange(func() { dartboard.SetDrawTwoSigma(drawTwoSigma, AccuracyModel.GetSigmaRadius(2)) }),
+				g.Checkbox("3 Sigma", &drawThreeSigma).OnChange(func() { dartboard.SetDrawThreeSigma(drawThreeSigma, AccuracyModel.GetSigmaRadius(3)) }),
 			}, nil),
 
 		// Once a number of throws have been accumulated, display the average score
@@ -288,19 +288,8 @@ func oneNormalThrow(dartboard Dartboard, position boardgeo.BoardPosition, model 
 	//  Draw a marker to record where we clicked
 	dartboard.QueueTargetMarker(position)
 
-	//	Draw circles showing requested sigma levels around the clicked point
-	if drawOneSigma {
-		oneSigmaRadius := model.GetSigmaRadius(1)
-		dartboard.QueueStdDeviationCircle(position, 1, oneSigmaRadius)
-	}
-	if drawTwoSigma {
-		twoSigmaRadius := model.GetSigmaRadius(2)
-		dartboard.QueueStdDeviationCircle(position, 2, twoSigmaRadius)
-	}
-	if drawThreeSigma {
-		threeSigmaRadius := model.GetSigmaRadius(3)
-		dartboard.QueueStdDeviationCircle(position, 3, threeSigmaRadius)
-	}
+	//	Set the position where any requested standard deviation circles will be drawn
+	dartboard.SetStdDeviationCirclesCentre(position)
 
 	//	Get a modeled hit within the accuracy
 	hit, err := model.GetThrow(position,
@@ -333,19 +322,9 @@ func multipleNormalThrows(dartboard Dartboard, position boardgeo.BoardPosition, 
 	//  Draw a marker to record where we clicked
 	dartboard.QueueTargetMarker(position)
 
-	//	Draw circles showing requested sigma levels around the clicked point
-	if drawOneSigma {
-		oneSigmaRadius := model.GetSigmaRadius(1)
-		dartboard.QueueStdDeviationCircle(position, 1, oneSigmaRadius)
-	}
-	if drawTwoSigma {
-		twoSigmaRadius := model.GetSigmaRadius(2)
-		dartboard.QueueStdDeviationCircle(position, 2, twoSigmaRadius)
-	}
-	if drawThreeSigma {
-		threeSigmaRadius := model.GetSigmaRadius(3)
-		dartboard.QueueStdDeviationCircle(position, 3, threeSigmaRadius)
-	}
+	//	Set the position where any requested standard deviation circles will be drawn
+	dartboard.SetStdDeviationCirclesCentre(position)
+
 	dartboard.AllocateHitsSpace(int(numThrowsField))
 
 	throwCount = 0

@@ -18,13 +18,16 @@ type Dartboard interface {
 	RemoveThrowMarkers()
 	QueueTargetMarker(position boardgeo.BoardPosition)
 	QueueAccuracyCircle(position boardgeo.BoardPosition, radius float64)
-	QueueStdDeviationCircle(position boardgeo.BoardPosition, multiplier float64, radius float64)
 	GetScoringRadiusPixels() float64
 	GetImageMinPoint() image.Point
 	GetSquareDimension() float64
 	QueueHitMarker(hit boardgeo.BoardPosition, markerRadius int)
 	AllocateHitsSpace(i int)
 	SetDrawRefLines(checkbox bool)
+	SetDrawOneSigma(draw bool, radius float64)
+	SetDrawTwoSigma(draw bool, radius float64)
+	SetDrawThreeSigma(draw bool, radius float64)
+	SetStdDeviationCirclesCentre(position boardgeo.BoardPosition)
 }
 
 const accuracyCircleThickness = 2
@@ -53,10 +56,10 @@ type DartboardInstance struct {
 	accuracyCircleRadius   float64
 	accuracyCirclePosition boardgeo.BoardPosition
 
-	// Zero or more circles showing the standard deviation radii around a clicked point
-	stdDevCirclePositions   []boardgeo.BoardPosition
-	stdDevCircleMultipliers []float64
-	stdDevCircleRadii       []float64
+	//// Zero or more circles showing the standard deviation radii around a clicked point
+	//stdDevCirclePositions   []boardgeo.BoardPosition
+	//stdDevCircleMultipliers []float64
+	//stdDevCircleRadii       []float64
 
 	// Slice of zero or more hits resulting from modeled throw
 	hitPositions    []boardgeo.BoardPosition
@@ -64,6 +67,18 @@ type DartboardInstance struct {
 
 	// Draw the testing crosshair?
 	drawReferenceLines bool
+
+	//	Draw reference circles for 1, 2, and 3 standard deviations?
+	stdDeviationCirclesCentre boardgeo.BoardPosition
+	stdDevClicked             bool
+	drawOneStdDeviation       bool
+	drawOneStdRadius          float64
+
+	drawTwoStdDeviation bool
+	drawTwoStdRadius    float64
+
+	drawThreeStdDeviation bool
+	drawThreeStdRadius    float64
 }
 
 func (d *DartboardInstance) AllocateHitsSpace(numHits int) {
@@ -72,15 +87,35 @@ func (d *DartboardInstance) AllocateHitsSpace(numHits int) {
 
 func NewDartboard(clickCallback func(dartboard Dartboard, position boardgeo.BoardPosition)) Dartboard {
 	instance := &DartboardInstance{
-		clickCallback:           clickCallback,
-		targetDrawn:             false,
-		drawAccuracyCircle:      false,
-		stdDevCirclePositions:   make([]boardgeo.BoardPosition, 0, 3),
-		stdDevCircleRadii:       make([]float64, 0, 3),
-		stdDevCircleMultipliers: make([]float64, 0, 3),
-		hitPositions:            make([]boardgeo.BoardPosition, 0, ThrowsAtOneTarget),
+		clickCallback:      clickCallback,
+		targetDrawn:        false,
+		drawAccuracyCircle: false,
+		hitPositions:       make([]boardgeo.BoardPosition, 0, ThrowsAtOneTarget),
 	}
 	return instance
+}
+
+func (d *DartboardInstance) SetStdDeviationCirclesCentre(position boardgeo.BoardPosition) {
+	d.stdDeviationCirclesCentre = position
+	d.stdDevClicked = true
+}
+
+func (d *DartboardInstance) SetDrawOneSigma(draw bool, radius float64) {
+	fmt.Printf("SetDrawOneSigma(%t, %g)\n", draw, radius)
+	d.drawOneStdDeviation = draw
+	d.drawOneStdRadius = radius
+}
+
+func (d *DartboardInstance) SetDrawTwoSigma(draw bool, radius float64) {
+	fmt.Printf("SetDrawTwoSigma(%t, %g)\n", draw, radius)
+	d.drawTwoStdDeviation = draw
+	d.drawTwoStdRadius = radius
+}
+
+func (d *DartboardInstance) SetDrawThreeSigma(draw bool, radius float64) {
+	fmt.Printf("SetDrawThreeSigma(%t, %g)\n", draw, radius)
+	d.drawThreeStdDeviation = draw
+	d.drawThreeStdRadius = radius
 }
 
 func (d *DartboardInstance) SetDrawRefLines(checkbox bool) {
@@ -115,10 +150,8 @@ func (d *DartboardInstance) SetClickCallback(callback func(dartboard Dartboard, 
 func (d *DartboardInstance) RemoveThrowMarkers() {
 	d.targetDrawn = false
 	d.drawAccuracyCircle = false
-	d.stdDevCirclePositions = make([]boardgeo.BoardPosition, 0, 3)
-	d.stdDevCircleRadii = make([]float64, 0, 3)
-	d.stdDevCircleMultipliers = make([]float64, 0, 3)
 	d.hitPositions = make([]boardgeo.BoardPosition, 0, ThrowsAtOneTarget)
+	d.stdDevClicked = false
 }
 
 func (d *DartboardInstance) DrawFunction() {
@@ -253,35 +286,45 @@ func (d *DartboardInstance) drawQueuedAccuracyCircle(canvas *g.Canvas) {
 
 // QueueStdDeviationCircle records the coordinates of a circle that will be drawn on the next UI loop pass
 // marking one of the standard deviation radii from the centre
-func (d *DartboardInstance) QueueStdDeviationCircle(position boardgeo.BoardPosition, multiplier float64, radius float64) {
-	d.stdDevCircleRadii = append(d.stdDevCircleRadii, radius)
-	d.stdDevCirclePositions = append(d.stdDevCirclePositions, position)
-	d.stdDevCircleMultipliers = append(d.stdDevCircleMultipliers, multiplier)
-}
+//func (d *DartboardInstance) QueueStdDeviationCircle(position boardgeo.BoardPosition, multiplier float64, radius float64) {
+//	d.stdDevCircleRadii = append(d.stdDevCircleRadii, radius)
+//	d.stdDevCirclePositions = append(d.stdDevCirclePositions, position)
+//	d.stdDevCircleMultipliers = append(d.stdDevCircleMultipliers, multiplier)
+//}
 
 // drawStdDeviationCircles draws the standard deviation circles that have been recorded
 func (d *DartboardInstance) drawStdDeviationCircles(canvas *g.Canvas) {
-	for i := 0; i < len(d.stdDevCirclePositions); i++ {
-		// Draw the circle for this standard deviation reference
-		stdDevPosition := d.stdDevCirclePositions[i]
-		stdDevRadius := d.stdDevCircleRadii[i]
-		xCentre, yCentre := boardgeo.GetDrawingXY(stdDevPosition)
-		circlePosition := image.Pt(xCentre+d.imageMin.X, yCentre+d.imageMin.Y)
-		drawRadius := stdDevRadius * d.squareDimension * boardgeo.ScoringAreaFraction / 2
-		canvas.AddCircle(circlePosition, float32(drawRadius), accuracyCircleColour, 0, accuracyCircleThickness)
-
-		//	Label the top of the circle with the multiplier
-		multiplier := d.stdDevCircleMultipliers[i]
-		circleLabel := fmt.Sprintf("%2g std", multiplier)
-		labelWidth, labelHeight := g.CalcTextSize(circleLabel)
-		//fmt.Printf("Label std dev circle of radius %g with multiplier %g: %s\n", stdDevRadius, multiplier, circleLabel)
-
-		labelPosition := circlePosition
-		labelPosition.X -= int(labelWidth / 2)
-		labelPosition.Y -= int(drawRadius + float64(labelHeight))
-		//fmt.Printf("  Label position %v text width %g height %g\n", circlePosition, labelWidth, labelHeight)
-		canvas.AddText(labelPosition, accuracyCircleColour, circleLabel)
+	if d.stdDevClicked {
+		//fmt.Printf("std dev clicked, d = %#v\n", d)
+		if d.drawOneStdDeviation {
+			d.drawStdDeviationCircle(canvas, 1, d.drawOneStdRadius)
+		}
+		if d.drawTwoStdDeviation {
+			d.drawStdDeviationCircle(canvas, 2, d.drawTwoStdRadius)
+		}
+		if d.drawThreeStdDeviation {
+			d.drawStdDeviationCircle(canvas, 3, d.drawThreeStdRadius)
+		}
 	}
+}
+
+func (d *DartboardInstance) drawStdDeviationCircle(canvas *g.Canvas, multiplier float64, radius float64) {
+	// Draw the circle for this standard deviation reference
+	xCentre, yCentre := boardgeo.GetDrawingXY(d.stdDeviationCirclesCentre)
+	circlePosition := image.Pt(xCentre+d.imageMin.X, yCentre+d.imageMin.Y)
+	drawRadius := radius * d.squareDimension * boardgeo.ScoringAreaFraction / 2
+	canvas.AddCircle(circlePosition, float32(drawRadius), accuracyCircleColour, 0, accuracyCircleThickness)
+
+	//	Label the top of the circle with the multiplier
+	circleLabel := fmt.Sprintf("%2g std", multiplier)
+	labelWidth, labelHeight := g.CalcTextSize(circleLabel)
+	//fmt.Printf("Label std dev circle of radius %g with multiplier %g: %s\n", stdDevRadius, multiplier, circleLabel)
+
+	labelPosition := circlePosition
+	labelPosition.X -= int(labelWidth / 2)
+	labelPosition.Y -= int(drawRadius + float64(labelHeight))
+	//fmt.Printf("  Label position %v text width %g height %g\n", circlePosition, labelWidth, labelHeight)
+	canvas.AddText(labelPosition, accuracyCircleColour, circleLabel)
 }
 
 // QueueHitMarker records the position of a throw hit in a list (there may be many). The queued markers will be drawn
