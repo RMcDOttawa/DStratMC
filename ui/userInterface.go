@@ -38,6 +38,7 @@ var dartboard Dartboard
 var AccuracyModel simulation.AccuracyModel
 var scoreDisplay string
 var messageDisplay string
+var searchResults [5]string
 var throwTotal int64
 var throwCount int64
 var throwAverage float64
@@ -53,6 +54,7 @@ func UserInterfaceSetup(loadedImage *image.RGBA) {
 	drawOneSigma = false
 	drawTwoSigma = false
 	drawThreeSigma = false
+	searchResults = [5]string{"a", "b", "c", "d", "e"}
 	g.EnqueueNewTextureFromRgba(loadedImage, func(t *g.Texture) {
 		DartboardTexture = t
 	})
@@ -123,6 +125,12 @@ func leftToolbarLayout(dartboard Dartboard) g.Widget {
 				g.Button("SEARCH").OnClick(func() {
 					searchForBestThrow(AccuracyModel, numThrowsField)
 				}),
+				g.Label(""),
+				g.Label(searchResults[0]),
+				g.Label(searchResults[1]),
+				g.Label(searchResults[2]),
+				g.Label(searchResults[3]),
+				g.Label(searchResults[4]),
 			}, nil),
 
 		// Once a number of throws have been accumulated, display the average score
@@ -139,7 +147,7 @@ func leftToolbarLayout(dartboard Dartboard) g.Widget {
 }
 
 func searchForBestThrow(model simulation.AccuracyModel, numThrows int32) {
-	fmt.Printf("Searching for best throw. model=%#v, numThrows=%d\n", model, numThrows)
+	//fmt.Printf("Searching for best throw. model=%#v, numThrows=%d\n", model, numThrows)
 	//	Get target iterator and results aggregator
 	const windowX = 0
 	const windowY = 0
@@ -157,12 +165,25 @@ func searchForBestThrow(model simulation.AccuracyModel, numThrows int32) {
 		//	record result for this target
 		results.AddTargetResult(target, averageScore)
 	}
+	//	Get results, sorted from best to worst
+	sortedResults := results.GetResultsSortedByHighScore()
+	//fmt.Println("First few sorted results:", sortedResults[:5])
+	//  Filter results so each plain-language target is named only once
+	oneEach := simulation.FilterToOneTargetEach(sortedResults)
+	//fmt.Println("First few one each results:", oneEach[:5])
 	// Message saying what was the best target
+	fmt.Println("First 5 best choices, from best down:")
+	for i := 0; i < 5; i++ {
+		_, score, description := boardgeo.DescribeBoardPoint(oneEach[i].Position)
+		fmt.Printf("   %s (theoretical score %d, average %g)\n", description, score, oneEach[i].Score)
+		searchResults[i] = fmt.Sprintf("%s (%g)", description, oneEach[i].Score)
+	}
 	//	Draw best target on the board
+	dartboard.QueueTargetMarker(oneEach[0].Position)
 }
 
 func multipleThrowsAtTarget(target boardgeo.BoardPosition, model simulation.AccuracyModel, throws int32) (float64, error) {
-	fmt.Println("multipleThrowsAtTarget", target, model, throws)
+	//fmt.Println("multipleThrowsAtTarget", target, model, throws)
 	var total float64 = 0.0
 	for i := 0; i < int(throws); i++ {
 		hit, err := model.GetThrow(target,
@@ -176,7 +197,7 @@ func multipleThrowsAtTarget(target boardgeo.BoardPosition, model simulation.Accu
 		total += float64(score)
 	}
 	average := total / float64(throws)
-	fmt.Println("   average", average)
+	//fmt.Println("   average", average)
 	return average, nil
 }
 
@@ -236,6 +257,7 @@ func radioChanged() {
 	throwTotal = 0
 	throwCount = 0
 	throwAverage = 0
+	searchResults = [5]string{"", "", "", "", ""}
 	dartboard.RemoveThrowMarkers()
 }
 

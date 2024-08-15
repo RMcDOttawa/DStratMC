@@ -2,19 +2,23 @@ package simulation
 
 import (
 	boardgeo "DStratMC/board-geometry"
-	"fmt"
+	"slices"
+	"sort"
 )
 
 type SimResults interface {
 	AddTargetResult(position boardgeo.BoardPosition, score float64)
-	//GetPositions() []boardgeo.BoardPosition
-	//GetAverageScore(p boardgeo.BoardPosition) float64
-	//GetPositionsSortedByHighScore() []boardgeo.BoardPosition
+	GetResultsSortedByHighScore() []OneResult
+	GetResultsSlice() []OneResult
 }
 
 type SimResultsInstance struct {
-	//SumMap   map[boardgeo.BoardPosition]int
-	//CountMap map[boardgeo.BoardPosition]int
+	resultsMap map[boardgeo.BoardPosition]float64
+}
+
+type OneResult struct {
+	Position boardgeo.BoardPosition
+	Score    float64
 }
 
 //func (s SimResultsInstance) GetAverageScore(p boardgeo.BoardPosition) float64 {
@@ -33,33 +37,50 @@ type SimResultsInstance struct {
 //	}
 //	return positions
 //}
-//
-//// Return the positions sorted from the highest average score to the lowest
-//func (s SimResultsInstance) GetPositionsSortedByHighScore() []boardgeo.BoardPosition {
-//	positions := s.GetPositions()
-//	//	Sort the positions by average score
-//	//	We'll use a simple bubble sort, because it's easy and we're not expecting a lot of positions
-//	for i := 0; i < len(positions); i++ {
-//		for j := i + 1; j < len(positions); j++ {
-//			if s.GetAverageScore(positions[i]) < s.GetAverageScore(positions[j]) {
-//				positions[i], positions[j] = positions[j], positions[i]
-//			}
-//		}
-//	}
-//	return positions
-//}
+
+// Return the positions sorted from the highest average score to the lowest
+func (s SimResultsInstance) GetResultsSortedByHighScore() []OneResult {
+	// Convert map to slice
+	slice := s.GetResultsSlice()
+	// Sort the slice by descending order of score
+	sort.Slice(slice, func(i, j int) bool {
+		return slice[i].Score > slice[j].Score
+	})
+	return slice
+}
+
+func (s SimResultsInstance) GetResultsSlice() []OneResult {
+	slice := make([]OneResult, 0, len(s.resultsMap))
+	for pos, score := range s.resultsMap {
+		slice = append(slice, OneResult{Position: pos, Score: score})
+	}
+	return slice
+}
 
 func NewSimResults() SimResults {
 	results := &SimResultsInstance{
-		//SumMap:   make(map[boardgeo.BoardPosition]int, 1000),
-		//CountMap: make(map[boardgeo.BoardPosition]int, 1000),
+		resultsMap: make(map[boardgeo.BoardPosition]float64, 4000),
 	}
-	fmt.Println("NewSimResults STUB returns", results)
+	//fmt.Println("NewSimResults  returns", results)
 	return results
 }
 
 func (s SimResultsInstance) AddTargetResult(position boardgeo.BoardPosition, score float64) {
-	fmt.Println("AddTargetResult STUB", position, score)
-	//s.SumMap[position] += score
-	//s.CountMap[position]++
+	//fmt.Println("AddTargetResult STUB", position, score)
+	s.resultsMap[position] = score
+}
+
+func FilterToOneTargetEach(results []OneResult) []OneResult {
+	targetsUsed := make([]string, 0, len(results))
+	outputSlice := make([]OneResult, 0, len(results))
+	for i := 0; i < len(results); i++ {
+		_, _, descriptionString := boardgeo.DescribeBoardPoint(results[i].Position)
+		if slices.Contains(targetsUsed, descriptionString) {
+			// Already have reported on this one, no more
+		} else {
+			outputSlice = append(outputSlice, results[i])
+			targetsUsed = append(targetsUsed, descriptionString)
+		}
+	}
+	return outputSlice
 }

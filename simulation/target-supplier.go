@@ -2,7 +2,6 @@ package simulation
 
 import (
 	boardgeo "DStratMC/board-geometry"
-	"fmt"
 	"image"
 	"math"
 )
@@ -41,7 +40,7 @@ func NewTargetSupplier(squareDimension float64, imageMinPoint image.Point, windo
 		windowX:         windowX,
 		windowY:         windowY,
 	}
-	fmt.Println("NewTargetSupplier returns", instance)
+	//fmt.Println("NewTargetSupplier returns", instance)
 	return instance
 }
 
