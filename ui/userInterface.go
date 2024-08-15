@@ -11,11 +11,12 @@ import (
 )
 
 const (
-	RadioExact = iota
-	RadioOneAvg
-	RadioMultiAvg
-	RadioOneNormal
-	RadioMultiNormal
+	RadioExact        = iota // Just record exact hit where clicked
+	RadioOneAvg              // Record one hit uniformly distributed within a circle
+	RadioMultiAvg            // Record multiple hits uniformly distributed within a circle
+	RadioOneNormal           // Record one hit normally distributed within a circle
+	RadioMultiNormal         // Record multiple hits normally distributed within a circle
+	RadioSearchNormal        // Search around the board, recording result of multi-normal at each search location
 )
 
 const LeftToolbarMinimumWidth = 200
@@ -28,6 +29,8 @@ const numThrowsTextWidth = 120
 const uniformCEPRadius = 0.3
 const normalCEPRadius = 0.25
 const stubStandardDeviation = normalCEPRadius * 2
+
+const testCoordinateConversion = true
 
 var radioValue int
 var DartboardTexture *g.Texture
@@ -80,6 +83,7 @@ func leftToolbarLayout(dartboard Dartboard) g.Widget {
 		g.RadioButton("Multi Throw Uniform", radioValue == RadioMultiAvg).OnChange(func() { radioValue = RadioMultiAvg; AccuracyModel = getAccuracyModel(radioValue); radioChanged() }),
 		g.RadioButton("One Throw Normal", radioValue == RadioOneNormal).OnChange(func() { radioValue = RadioOneNormal; AccuracyModel = getAccuracyModel(radioValue); radioChanged() }),
 		g.RadioButton("Multi Throw Normal", radioValue == RadioMultiNormal).OnChange(func() { radioValue = RadioMultiNormal; AccuracyModel = getAccuracyModel(radioValue); radioChanged() }),
+		g.RadioButton("Search Normal", radioValue == RadioSearchNormal).OnChange(func() { radioValue = RadioSearchNormal; AccuracyModel = getAccuracyModel(radioValue); radioChanged() }),
 
 		// A reset button resets counters and displays
 		g.Label(""),
@@ -94,7 +98,7 @@ func leftToolbarLayout(dartboard Dartboard) g.Widget {
 			}, nil),
 
 		// If we are doing multiple throws, allow the user to set the number of throws
-		g.Condition(radioValue == RadioMultiAvg || radioValue == RadioMultiNormal,
+		g.Condition(radioValue == RadioMultiAvg || radioValue == RadioMultiNormal || radioValue == RadioSearchNormal,
 			g.Layout{
 				g.Label(""),
 				g.InputInt(&numThrowsField).Label("# Throws").
@@ -112,6 +116,14 @@ func leftToolbarLayout(dartboard Dartboard) g.Widget {
 				g.Checkbox("2 Sigma", &drawTwoSigma).OnChange(func() { dartboard.SetDrawTwoSigma(drawTwoSigma, AccuracyModel.GetSigmaRadius(2)) }),
 				g.Checkbox("3 Sigma", &drawThreeSigma).OnChange(func() { dartboard.SetDrawThreeSigma(drawThreeSigma, AccuracyModel.GetSigmaRadius(3)) }),
 			}, nil),
+		// If we are doing a search, offer a "SEARCH" button to begin
+		g.Condition(radioValue == RadioSearchNormal,
+			g.Layout{
+				g.Label(""),
+				g.Button("SEARCH").OnClick(func() {
+					searchForBestThrow(AccuracyModel, numThrowsField)
+				}),
+			}, nil),
 
 		// Once a number of throws have been accumulated, display the average score
 		g.Condition(throwCount > 0,
@@ -126,6 +138,48 @@ func leftToolbarLayout(dartboard Dartboard) g.Widget {
 
 }
 
+func searchForBestThrow(model simulation.AccuracyModel, numThrows int32) {
+	fmt.Printf("Searching for best throw. model=%#v, numThrows=%d\n", model, numThrows)
+	//	Get target iterator and results aggregator
+	const windowX = 0
+	const windowY = 0
+	targetSupplier := simulation.NewTargetSupplier(dartboard.GetSquareDimension(), dartboard.GetImageMinPoint(), windowX, windowY)
+	results := simulation.NewSimResults()
+	// Loop through all targets
+	for targetSupplier.HasNext() {
+		target := targetSupplier.NextTarget()
+		// Do throws at this target
+		averageScore, err := multipleThrowsAtTarget(target, model, numThrows)
+		if err != nil {
+			fmt.Printf("Error getting throw %v", err)
+			continue
+		}
+		//	record result for this target
+		results.AddTargetResult(target, averageScore)
+	}
+	// Message saying what was the best target
+	//	Draw best target on the board
+}
+
+func multipleThrowsAtTarget(target boardgeo.BoardPosition, model simulation.AccuracyModel, throws int32) (float64, error) {
+	fmt.Println("multipleThrowsAtTarget", target, model, throws)
+	var total float64 = 0.0
+	for i := 0; i < int(throws); i++ {
+		hit, err := model.GetThrow(target,
+			dartboard.GetScoringRadiusPixels(),
+			dartboard.GetSquareDimension(),
+			dartboard.GetImageMinPoint())
+		if err != nil {
+			return 0.0, err
+		}
+		_, score, _ := boardgeo.DescribeBoardPoint(hit)
+		total += float64(score)
+	}
+	average := total / float64(throws)
+	fmt.Println("   average", average)
+	return average, nil
+}
+
 func getAccuracyModel(radioValue int) simulation.AccuracyModel {
 	switch radioValue {
 	case RadioExact:
@@ -137,6 +191,8 @@ func getAccuracyModel(radioValue int) simulation.AccuracyModel {
 	case RadioOneNormal:
 		return simulation.NewNormalAccuracyModel(normalCEPRadius, stubStandardDeviation)
 	case RadioMultiNormal:
+		return simulation.NewNormalAccuracyModel(normalCEPRadius, stubStandardDeviation)
+	case RadioSearchNormal:
 		return simulation.NewNormalAccuracyModel(normalCEPRadius, stubStandardDeviation)
 	default:
 		panic("Invalid radio button value")
@@ -184,7 +240,18 @@ func radioChanged() {
 }
 
 func dartboardClickCallback(dartboard Dartboard, position boardgeo.BoardPosition) {
-	//fmt.Printf("Dartboard clicked at radius %g, angle %g\n", position.Radius, position.Angle)
+	//fmt.Printf("Dartboard clicked at position %#v\n", position)
+	// This is a good place to verify that coordinate conversion is working
+	if testCoordinateConversion {
+		testConvertPolar := boardgeo.CreateBoardPositionFromPolar(position.Radius, position.Angle, dartboard.GetSquareDimension())
+		if position.Radius != testConvertPolar.Radius || position.Angle != testConvertPolar.Angle {
+			panic("Coordinate conversion failed: polar coordinates do not match")
+		}
+		if position.XMouseInside != testConvertPolar.XMouseInside || position.YMouseInside != testConvertPolar.YMouseInside {
+			panic("Coordinate conversion failed: cartesian coordinates do not match")
+		}
+	}
+	//fmt.Printf("  Polar converted back to %#v\n", testConvertPolar)
 	if position.Radius <= 1.0 {
 		messageDisplay = ""
 		scoreDisplay = ""
@@ -203,6 +270,8 @@ func dartboardClickCallback(dartboard Dartboard, position boardgeo.BoardPosition
 			oneNormalThrow(dartboard, position, AccuracyModel)
 		case RadioMultiNormal:
 			multipleNormalThrows(dartboard, position, AccuracyModel)
+		case RadioSearchNormal:
+			messageDisplay = "Click SEARCH to begin"
 		default:
 			panic("Invalid radio button value")
 		}

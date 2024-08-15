@@ -67,9 +67,37 @@ func CreateBoardPositionFromXY(mousePosition image.Point,
 		Radius:       polarRadius,
 		Angle:        thetaAsDegrees,
 	}
+	//fmt.Printf("CreateBoardPositionFromXY(%v) -> %#v\n", mousePosition, position)
 	return position
 }
 
 func GetDrawingXY(position BoardPosition) (int, int) {
+	//fmt.Printf("GetDrawingXY(%#v)\n", position)
 	return position.XMouseInside, position.YMouseInside
+}
+
+func CreateBoardPositionFromPolar(polarRadius float64, thetaDegrees float64,
+	squareDimension float64) BoardPosition {
+	//	Get the x,y equivalents
+	xFromPolar := polarRadius * math.Sin(thetaDegrees*math.Pi/180)
+	yFromPolar := polarRadius * math.Cos(thetaDegrees*math.Pi/180)
+	//fmt.Printf("CreateBoardPositionFromPolar(%g,%g) xFromPolar %g, yFromPolar %g\n",
+	//	polarRadius, thetaDegrees, xFromPolar, yFromPolar)
+	xScaledByScoringFraction := xFromPolar * ScoringAreaFraction
+	yScaledByScoringFraction := yFromPolar * ScoringAreaFraction
+	//fmt.Printf("   xScaledByScoringFraction %g, yScaledByScoringFraction %g\n",
+	//	xScaledByScoringFraction, yScaledByScoringFraction)
+	xScaledToWindow := xScaledByScoringFraction * (squareDimension / 2)
+	yScaledToWindow := yScaledByScoringFraction * (squareDimension / 2)
+	//fmt.Printf("   xScaledToWindow %g, yScaledToWindow %g\n", xScaledToWindow, yScaledToWindow)
+	xInsideWindow := int(math.Round(xScaledToWindow + squareDimension/2))
+	yInsideWindow := int(math.Round(squareDimension/2 - yScaledToWindow))
+	//fmt.Printf("   xWindow %d, yWindow %d\n", xInsideWindow, yInsideWindow)
+	position := BoardPosition{
+		XMouseInside: xInsideWindow,
+		YMouseInside: yInsideWindow,
+		Radius:       polarRadius,
+		Angle:        thetaDegrees,
+	}
+	return position
 }

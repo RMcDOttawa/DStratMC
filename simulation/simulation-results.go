@@ -1,23 +1,22 @@
 package simulation
 
-//
-//import (
-//	boardgeo "DStratMC/board-geometry"
-//	"fmt"
-//)
-//
-//type SimResults interface {
-//	AddThrow(position boardgeo.BoardPosition, score int)
-//	GetPositions() []boardgeo.BoardPosition
-//	GetAverageScore(p boardgeo.BoardPosition) float64
-//	GetPositionsSortedByHighScore() []boardgeo.BoardPosition
-//}
-//
-//type SimResultsInstance struct {
-//	SumMap   map[boardgeo.BoardPosition]int
-//	CountMap map[boardgeo.BoardPosition]int
-//}
-//
+import (
+	boardgeo "DStratMC/board-geometry"
+	"fmt"
+)
+
+type SimResults interface {
+	AddTargetResult(position boardgeo.BoardPosition, score float64)
+	//GetPositions() []boardgeo.BoardPosition
+	//GetAverageScore(p boardgeo.BoardPosition) float64
+	//GetPositionsSortedByHighScore() []boardgeo.BoardPosition
+}
+
+type SimResultsInstance struct {
+	//SumMap   map[boardgeo.BoardPosition]int
+	//CountMap map[boardgeo.BoardPosition]int
+}
+
 //func (s SimResultsInstance) GetAverageScore(p boardgeo.BoardPosition) float64 {
 //	sum := s.SumMap[p]
 //	count := s.CountMap[p]
@@ -49,17 +48,18 @@ package simulation
 //	}
 //	return positions
 //}
-//
-//func NewSimResults() SimResults {
-//	results := &SimResultsInstance{
-//		SumMap:   make(map[boardgeo.BoardPosition]int, 1000),
-//		CountMap: make(map[boardgeo.BoardPosition]int, 1000),
-//	}
-//	fmt.Println("NewSimResults returns", results)
-//	return results
-//}
-//
-//func (s SimResultsInstance) AddThrow(position boardgeo.BoardPosition, score int) {
-//	s.SumMap[position] += score
-//	s.CountMap[position]++
-//}
+
+func NewSimResults() SimResults {
+	results := &SimResultsInstance{
+		//SumMap:   make(map[boardgeo.BoardPosition]int, 1000),
+		//CountMap: make(map[boardgeo.BoardPosition]int, 1000),
+	}
+	fmt.Println("NewSimResults STUB returns", results)
+	return results
+}
+
+func (s SimResultsInstance) AddTargetResult(position boardgeo.BoardPosition, score float64) {
+	fmt.Println("AddTargetResult STUB", position, score)
+	//s.SumMap[position] += score
+	//s.CountMap[position]++
+}
