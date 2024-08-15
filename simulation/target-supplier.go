@@ -25,20 +25,16 @@ type CircularTargetSupplierInstance struct {
 	angleIncrement  float64
 	squareDimension float64
 	imageMinPoint   image.Point
-	windowX         int
-	windowY         int
 }
 
-func NewTargetSupplier(squareDimension float64, imageMinPoint image.Point, windowX int, windowY int) TargetSupplier {
+func NewTargetSupplier(squareDimension float64, imageMinPoint image.Point) TargetSupplier {
 	instance := &CircularTargetSupplierInstance{
 		nextRadius:      0.0,
 		nextAngle:       0.0,
-		radiusIncrement: 0.1,
+		radiusIncrement: 0.05,
 		angleIncrement:  1.0,
 		squareDimension: squareDimension,
 		imageMinPoint:   imageMinPoint,
-		windowX:         windowX,
-		windowY:         windowY,
 	}
 	//fmt.Println("NewTargetSupplier returns", instance)
 	return instance

@@ -3,11 +3,14 @@ package ui
 import (
 	boardgeo "DStratMC/board-geometry"
 	"DStratMC/simulation"
+	"context"
+	_ "embed"
 	"fmt"
 	g "github.com/AllenDang/giu"
 	"image"
 	"math"
 	"strconv"
+	"time"
 )
 
 const (
@@ -27,7 +30,11 @@ const ThrowsAtOneTarget = 5_000
 const numThrowsTextWidth = 120
 
 const uniformCEPRadius = 0.3
-const normalCEPRadius = 0.25
+
+// const normalCEPRadius = 0.25
+const normalCEPRadius = 0.2
+
+// const normalCEPRadius = 0.1
 const stubStandardDeviation = normalCEPRadius * 2
 
 const testCoordinateConversion = true
@@ -38,7 +45,7 @@ var dartboard Dartboard
 var AccuracyModel simulation.AccuracyModel
 var scoreDisplay string
 var messageDisplay string
-var searchResults [5]string
+var searchResults [10]string
 var throwTotal int64
 var throwCount int64
 var throwAverage float64
@@ -49,12 +56,16 @@ var drawOneSigma bool
 var drawTwoSigma bool
 var drawThreeSigma bool
 
+var SearchComplete = false
+var SearchingBlinkOn = false
+var CancelBlinkTimer context.CancelFunc
+
 func UserInterfaceSetup(loadedImage *image.RGBA) {
 	radioValue = RadioOneNormal
 	drawOneSigma = false
 	drawTwoSigma = false
 	drawThreeSigma = false
-	searchResults = [5]string{"a", "b", "c", "d", "e"}
+	searchResults = [10]string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j"}
 	g.EnqueueNewTextureFromRgba(loadedImage, func(t *g.Texture) {
 		DartboardTexture = t
 	})
@@ -123,14 +134,32 @@ func leftToolbarLayout(dartboard Dartboard) g.Widget {
 			g.Layout{
 				g.Label(""),
 				g.Button("SEARCH").OnClick(func() {
-					searchForBestThrow(AccuracyModel, numThrowsField)
+					startSearchForBestThrow(AccuracyModel, numThrowsField)
 				}),
+			}, nil),
+		g.Condition(radioValue == RadioSearchNormal,
+			g.Layout{
 				g.Label(""),
+				g.Condition(SearchingBlinkOn,
+					g.CSSTag("waitlabel").To(
+						g.Label("Searching, please wait"),
+					),
+					g.Label("")),
+			}, nil),
+		g.Condition(radioValue == RadioSearchNormal && SearchComplete,
+			g.Layout{
+				g.Label(""),
+				g.Label("Best 10:"),
 				g.Label(searchResults[0]),
 				g.Label(searchResults[1]),
 				g.Label(searchResults[2]),
 				g.Label(searchResults[3]),
 				g.Label(searchResults[4]),
+				g.Label(searchResults[5]),
+				g.Label(searchResults[6]),
+				g.Label(searchResults[7]),
+				g.Label(searchResults[8]),
+				g.Label(searchResults[9]),
 			}, nil),
 
 		// Once a number of throws have been accumulated, display the average score
@@ -146,12 +175,42 @@ func leftToolbarLayout(dartboard Dartboard) g.Widget {
 
 }
 
-func searchForBestThrow(model simulation.AccuracyModel, numThrows int32) {
-	//fmt.Printf("Searching for best throw. model=%#v, numThrows=%d\n", model, numThrows)
+func startSearchForBestThrow(model simulation.AccuracyModel, numThrows int32) {
+	searchResults = [10]string{"", "", "", "", "", "", "", "", "", ""}
+	dartboard.RemoveThrowMarkers()
+	SearchComplete = false
+	g.Update()
+	//fmt.Printf("Starting search for for best throw. model=%#v, numThrows=%d\n", model, numThrows)
+	//	Start a process to blink the "searching" label on and off
+	var ctx context.Context
+	ctx, CancelBlinkTimer = context.WithCancel(context.Background())
+	go cycleBlinkFlag(ctx)
+
+	//	Start the actual search process
+	go searchProcess(model, numThrows)
+	//fmt.Println("Search started")
+}
+
+func cycleBlinkFlag(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			//fmt.Println("Blink timer stopped")
+			SearchingBlinkOn = false
+			return
+		default:
+			//fmt.Println("Blink timer running")
+			SearchingBlinkOn = !SearchingBlinkOn
+			g.Update()
+			time.Sleep(500 * time.Millisecond)
+		}
+	}
+}
+
+func searchProcess(model simulation.AccuracyModel, numThrows int32) {
+	//fmt.Println("search process entered")
 	//	Get target iterator and results aggregator
-	const windowX = 0
-	const windowY = 0
-	targetSupplier := simulation.NewTargetSupplier(dartboard.GetSquareDimension(), dartboard.GetImageMinPoint(), windowX, windowY)
+	targetSupplier := simulation.NewTargetSupplier(dartboard.GetSquareDimension(), dartboard.GetImageMinPoint())
 	results := simulation.NewSimResults()
 	// Loop through all targets
 	for targetSupplier.HasNext() {
@@ -173,13 +232,18 @@ func searchForBestThrow(model simulation.AccuracyModel, numThrows int32) {
 	//fmt.Println("First few one each results:", oneEach[:5])
 	// Message saying what was the best target
 	fmt.Println("First 5 best choices, from best down:")
-	for i := 0; i < 5; i++ {
+	for i := 0; i < 10; i++ {
 		_, score, description := boardgeo.DescribeBoardPoint(oneEach[i].Position)
 		fmt.Printf("   %s (theoretical score %d, average %g)\n", description, score, oneEach[i].Score)
 		searchResults[i] = fmt.Sprintf("%s (%g)", description, oneEach[i].Score)
+		SearchComplete = true
 	}
 	//	Draw best target on the board
 	dartboard.QueueTargetMarker(oneEach[0].Position)
+	//	Stop the blink timer
+	CancelBlinkTimer()
+	g.Update()
+	//fmt.Println("Search process ends")
 }
 
 func multipleThrowsAtTarget(target boardgeo.BoardPosition, model simulation.AccuracyModel, throws int32) (float64, error) {
@@ -257,8 +321,10 @@ func radioChanged() {
 	throwTotal = 0
 	throwCount = 0
 	throwAverage = 0
-	searchResults = [5]string{"", "", "", "", ""}
+	searchResults = [10]string{"", "", "", "", "", "", "", "", "", ""}
 	dartboard.RemoveThrowMarkers()
+	SearchComplete = false
+	SearchingBlinkOn = false
 }
 
 func dartboardClickCallback(dartboard Dartboard, position boardgeo.BoardPosition) {
