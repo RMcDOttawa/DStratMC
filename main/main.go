@@ -20,7 +20,7 @@ func main() {
 		fmt.Println("Unable to load dartboard image:", err)
 		return
 	}
-	ui.UserInterfaceSetup(loadedImage)
-	wnd.Run(ui.MainUiLoop)
+	userInterface := ui.NewUserInterface(loadedImage)
+	wnd.Run(userInterface.MainUiLoop)
 
 }

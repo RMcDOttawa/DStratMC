@@ -85,12 +85,12 @@ func (d *DartboardInstance) AllocateHitsSpace(numHits int) {
 	d.hitPositions = make([]boardgeo.BoardPosition, 0, numHits)
 }
 
-func NewDartboard(clickCallback func(dartboard Dartboard, position boardgeo.BoardPosition)) Dartboard {
+func NewDartboard() Dartboard {
 	instance := &DartboardInstance{
-		clickCallback:      clickCallback,
+		clickCallback:      nil,
 		targetDrawn:        false,
 		drawAccuracyCircle: false,
-		hitPositions:       make([]boardgeo.BoardPosition, 0, ThrowsAtOneTarget),
+		hitPositions:       make([]boardgeo.BoardPosition, 0, throwsAtOneTarget),
 	}
 	return instance
 }
@@ -150,7 +150,7 @@ func (d *DartboardInstance) SetClickCallback(callback func(dartboard Dartboard, 
 func (d *DartboardInstance) RemoveThrowMarkers() {
 	d.targetDrawn = false
 	d.drawAccuracyCircle = false
-	d.hitPositions = make([]boardgeo.BoardPosition, 0, ThrowsAtOneTarget)
+	d.hitPositions = make([]boardgeo.BoardPosition, 0, throwsAtOneTarget)
 	d.stdDevClicked = false
 }
 
@@ -221,7 +221,7 @@ func (d *DartboardInstance) drawReferenceLinesOnDartboard(canvas *g.Canvas) {
 func (d *DartboardInstance) dartboardClicked() {
 	//fmt.Println("dartboard clicked")
 	if d.clickCallback == nil {
-		//fmt.Println("  No callback function")
+		panic("  No callback function")
 	} else {
 		position := boardgeo.CreateBoardPositionFromXY(g.GetMousePos(), d.squareDimension,
 			d.imageMin)
