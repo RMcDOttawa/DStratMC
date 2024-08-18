@@ -111,8 +111,8 @@ func (u *UserInterfaceInstance) loopThroughAllTargets(ctx context.Context, model
 			// Mark this target on the dartboard
 			if u.searchShowEachTarget {
 				u.dartboard.QueueTargetMarker(target)
-				g.Update()
 			}
+			g.Update()
 			// Do a large number of throws at this target
 			averageScore, err := u.multipleThrowsAtTarget(target, model, numThrows)
 			if err != nil {

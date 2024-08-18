@@ -19,22 +19,18 @@ const (
 const LeftToolbarMinimumWidth = 200
 const singleHitMarkerRadius = 5
 const multipleHitMarkerRadius = 1
-
-// How many throws are used in a multi-throw averaging run
-const throwsAtOneTarget = 5_000
 const numThrowsTextWidth = 120
 
-//	Eventually the following will become computed variables: the size of the target circle
-//	for uniform modeling, or of the 2-standard-deviation circle for normal modeling.
-//	(CEP is Circular Error Probable, a nod to terminology about the accuracy of ballistics)
+// How many throws are used in a multi-throw averaging run
+const throwsAtOneTarget = 7_500
 
+//	Eventually the following will become computed variables:
+
+// the size of the target circle for uniform modeling,
 const uniformCEPRadius = 0.3
 
-//const normalCEPRadius = 0.3
-
-const normalCEPRadius = 0.25
-
-// const normalCEPRadius = 0.1
-const stubStandardDeviation = normalCEPRadius * 2
+// Standard deviation of polar radius, for normal distribution.
+// 2* this deviation would be roughly the same as the CEP radius for uniform distribution
+const normalStdDev = .15
 
 const testCoordinateConversion = true

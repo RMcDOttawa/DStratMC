@@ -11,15 +11,15 @@ import (
 )
 
 type NormalAccuracyModel struct {
-	CEPRadius          float64 // Temporary. Eventually won't need this - just use the standard deviation
+	//CEPRadius          float64 // Temporary. Eventually won't need this - just use the standard deviation
 	standardDeviation  float64
 	normalDistribution distuv.Normal
 }
 
 // NewNormalAccuracyModel creates a new instance of the NormalAccuracyModel
-func NewNormalAccuracyModel(CEPRadius float64, stdDev float64) AccuracyModel {
+func NewNormalAccuracyModel(stdDev float64) AccuracyModel {
 	instance := &NormalAccuracyModel{
-		CEPRadius:         CEPRadius,
+		//CEPRadius:         stdDev * 2,  // Usual circle will be
 		standardDeviation: stdDev,
 		normalDistribution: distuv.Normal{
 			Mu:    0.0,
@@ -47,8 +47,8 @@ func (p NormalAccuracyModel) GetThrow(target boardgeo.BoardPosition,
 	// Generate normally distributed random offsets
 	randomXDeviation := p.normalDistribution.Rand()
 	randomYDeviation := p.normalDistribution.Rand()
-	deltaX := randomXDeviation * scoringRadius * p.CEPRadius
-	deltaY := randomYDeviation * scoringRadius * p.CEPRadius
+	deltaX := randomXDeviation * scoringRadius
+	deltaY := randomYDeviation * scoringRadius
 
 	// Calculate the final coordinates in Cartesian form
 	xFinal := target.XMouseInside + int(math.Round(deltaX))
@@ -65,5 +65,5 @@ func (p NormalAccuracyModel) GetThrow(target boardgeo.BoardPosition,
 // So a "2 sigma" circle would represent the area that you would expect most darts to land.
 // A 3 sigma circle should catch almost all darts - darts outside this circle would be classified "wild throws" or "outliers".
 func (p NormalAccuracyModel) GetSigmaRadius(numSigmas float64) float64 {
-	return p.CEPRadius * numSigmas * p.standardDeviation
+	return numSigmas * p.standardDeviation
 }

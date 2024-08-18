@@ -58,7 +58,7 @@ func NewUserInterface(loadedImage *image.RGBA) UserInterface {
 		drawOneSigma:               false,
 		drawTwoSigma:               false,
 		drawThreeSigma:             false,
-		searchShowEachTarget:       true,
+		searchShowEachTarget:       false,
 		searchResultStrings:        [10]string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j"},
 		dartboard:                  NewDartboard(),
 		drawReferenceLinesCheckbox: true,
@@ -344,11 +344,11 @@ func (u *UserInterfaceInstance) getAccuracyModel(mode InterfaceMode) simulation.
 	case Mode_MultiAvg:
 		return simulation.NewUniformAccuracyModel(uniformCEPRadius)
 	case Mode_OneNormal:
-		return simulation.NewNormalAccuracyModel(normalCEPRadius, stubStandardDeviation)
+		return simulation.NewNormalAccuracyModel(normalStdDev)
 	case Mode_MultiNormal:
-		return simulation.NewNormalAccuracyModel(normalCEPRadius, stubStandardDeviation)
+		return simulation.NewNormalAccuracyModel(normalStdDev)
 	case Mode_SearchNormal:
-		return simulation.NewNormalAccuracyModel(normalCEPRadius, stubStandardDeviation)
+		return simulation.NewNormalAccuracyModel(normalStdDev)
 	default:
 		panic("Invalid radio button value")
 		return simulation.NewPerfectAccuracyModel()
