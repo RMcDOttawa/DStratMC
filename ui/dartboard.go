@@ -297,18 +297,18 @@ func (d *DartboardInstance) drawStdDeviationCircles(canvas *g.Canvas) {
 	if d.stdDevClicked {
 		//fmt.Printf("std dev clicked, d = %#v\n", d)
 		if d.drawOneStdDeviation {
-			d.drawStdDeviationCircle(canvas, 1, d.drawOneStdRadius)
+			d.drawStdDeviationCircle(canvas, 1, "68", d.drawOneStdRadius)
 		}
 		if d.drawTwoStdDeviation {
-			d.drawStdDeviationCircle(canvas, 2, d.drawTwoStdRadius)
+			d.drawStdDeviationCircle(canvas, 2, "95", d.drawTwoStdRadius)
 		}
 		if d.drawThreeStdDeviation {
-			d.drawStdDeviationCircle(canvas, 3, d.drawThreeStdRadius)
+			d.drawStdDeviationCircle(canvas, 3, "99.7", d.drawThreeStdRadius)
 		}
 	}
 }
 
-func (d *DartboardInstance) drawStdDeviationCircle(canvas *g.Canvas, multiplier float64, radius float64) {
+func (d *DartboardInstance) drawStdDeviationCircle(canvas *g.Canvas, multiplier float64, percentageString string, radius float64) {
 	// Draw the circle for this standard deviation reference
 	xCentre, yCentre := boardgeo.GetDrawingXY(d.stdDeviationCirclesCentre)
 	circlePosition := image.Pt(xCentre+d.imageMin.X, yCentre+d.imageMin.Y)
@@ -316,7 +316,7 @@ func (d *DartboardInstance) drawStdDeviationCircle(canvas *g.Canvas, multiplier 
 	canvas.AddCircle(circlePosition, float32(drawRadius), accuracyCircleColour, 0, accuracyCircleThickness)
 
 	//	Label the top of the circle with the multiplier
-	circleLabel := fmt.Sprintf("%2g std", multiplier)
+	circleLabel := fmt.Sprintf("%2g std (%s%%)", multiplier, percentageString)
 	labelWidth, labelHeight := g.CalcTextSize(circleLabel)
 	//fmt.Printf("Label std dev circle of radius %g with multiplier %g: %s\n", stdDevRadius, multiplier, circleLabel)
 

@@ -31,9 +31,9 @@ const numThrowsTextWidth = 120
 
 const uniformCEPRadius = 0.3
 
-const normalCEPRadius = 0.3
+//const normalCEPRadius = 0.3
 
-//const normalCEPRadius = 0.2
+const normalCEPRadius = 0.25
 
 // const normalCEPRadius = 0.1
 const stubStandardDeviation = normalCEPRadius * 2
@@ -129,16 +129,16 @@ func (u *UserInterfaceInstance) uiLayoutInteractionTypeRadioButtons() g.Widget {
 			u.accuracyModel = u.getAccuracyModel(u.radioValue)
 			u.radioChanged()
 		}),
-		g.RadioButton("One Throw Uniform", u.radioValue == RadioOneAvg).OnChange(func() {
-			u.radioValue = RadioOneAvg
-			u.accuracyModel = u.getAccuracyModel(u.radioValue)
-			u.radioChanged()
-		}),
-		g.RadioButton("Multi Throw Uniform", u.radioValue == RadioMultiAvg).OnChange(func() {
-			u.radioValue = RadioMultiAvg
-			u.accuracyModel = u.getAccuracyModel(u.radioValue)
-			u.radioChanged()
-		}),
+		//g.RadioButton("One Throw Uniform", u.radioValue == RadioOneAvg).OnChange(func() {
+		//	u.radioValue = RadioOneAvg
+		//	u.accuracyModel = u.getAccuracyModel(u.radioValue)
+		//	u.radioChanged()
+		//}),
+		//g.RadioButton("Multi Throw Uniform", u.radioValue == RadioMultiAvg).OnChange(func() {
+		//	u.radioValue = RadioMultiAvg
+		//	u.accuracyModel = u.getAccuracyModel(u.radioValue)
+		//	u.radioChanged()
+		//}),
 		g.RadioButton("One Throw Normal", u.radioValue == RadioOneNormal).OnChange(func() {
 			u.radioValue = RadioOneNormal
 			u.accuracyModel = u.getAccuracyModel(u.radioValue)
@@ -278,7 +278,10 @@ func (u *UserInterfaceInstance) uiLayoutSearchResultLabels(numLabels int) g.Layo
 // It will draw a marker at the precise location of that reported search result
 func (u *UserInterfaceInstance) resultButtonClicked(buttonIndex int) {
 	if buttonIndex < len(u.simResultsOneEach) {
-		u.dartboard.QueueTargetMarker(u.simResultsOneEach[buttonIndex].Position)
+		//	Set the position where any requested standard deviation circles will be drawn
+		targetPosition := u.simResultsOneEach[buttonIndex].Position
+		u.dartboard.SetStdDeviationCirclesCentre(targetPosition)
+		u.dartboard.QueueTargetMarker(targetPosition)
 		g.Update()
 	}
 }
@@ -348,7 +351,9 @@ func (u *UserInterfaceInstance) searchProcess(model simulation.AccuracyModel, nu
 		u.searchComplete = true
 	}
 	//	Draw best target on the board
-	u.dartboard.QueueTargetMarker(u.simResultsOneEach[0].Position)
+	bestTargetPosition := u.simResultsOneEach[0].Position
+	u.dartboard.SetStdDeviationCirclesCentre(bestTargetPosition)
+	u.dartboard.QueueTargetMarker(bestTargetPosition)
 	//	Stop the blink timer
 	u.cancelBlinkTimer()
 	g.Update()
@@ -444,8 +449,13 @@ func (u *UserInterfaceInstance) dartboardClickCallback(dartboard Dartboard, posi
 		if position.Radius != testConvertPolar.Radius || position.Angle != testConvertPolar.Angle {
 			panic("Coordinate conversion failed: polar coordinates do not match")
 		}
-		if position.XMouseInside != testConvertPolar.XMouseInside || position.YMouseInside != testConvertPolar.YMouseInside {
-			panic("Coordinate conversion failed: cartesian coordinates do not match")
+		xDelta := math.Abs(float64(position.XMouseInside) - float64(testConvertPolar.XMouseInside))
+		yDelta := math.Abs(float64(position.YMouseInside) - float64(testConvertPolar.YMouseInside))
+		if xDelta > 1 || yDelta > 1 {
+			details := fmt.Sprintf("x %d,%d  y %d,%d",
+				position.XMouseInside, testConvertPolar.XMouseInside,
+				position.YMouseInside, testConvertPolar.YMouseInside)
+			panic("Coordinate conversion failed: cartesian coordinates do not match: " + details)
 		}
 	}
 	//fmt.Printf("  Polar converted back to %#v\n", testConvertPolar)
@@ -612,9 +622,7 @@ func (u *UserInterfaceInstance) multipleNormalThrows(dartboard Dartboard, positi
 		dartboard.QueueHitMarker(hit, multipleHitMarkerRadius)
 
 		//	Calculate the hit score
-		_, score, description := boardgeo.DescribeBoardPoint(hit)
-		u.messageDisplay = description
-		u.scoreDisplay = strconv.Itoa(score) + " points"
+		_, score, _ := boardgeo.DescribeBoardPoint(hit)
 		u.throwCount++
 		u.throwTotal += int64(score)
 		u.throwAverage = float64(u.throwTotal) / float64(u.throwCount)
