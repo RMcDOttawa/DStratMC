@@ -1,6 +1,6 @@
-/*color: rgba(50, 100, 150, 255);*/
+/* CSS Style sheet used to format certain UI elements */
 
-
+/* The "searching, please wait" message is coloured red */
 waitlabel {
     color: red;
 }

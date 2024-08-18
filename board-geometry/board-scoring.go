@@ -1,7 +1,11 @@
 package boardgeo
 
+//	These are the data and functions used to determine the scoring value of a dart throw
+
 import "math"
 
+// Boundaries between the single, double, and treble areas on the board, measured
+// in normalized radius units (0.0 to 1.0) from the centre of the board
 var multiplierBoundaries = [...]float64{
 	0.0, // Exact centre of board
 	innerBullRadiusNormalized,
@@ -23,10 +27,13 @@ var multiplierList = [...]int{
 	0, //	Outside board
 }
 
-// Point values of silces, clockwise from the top
+// Point values of slices, clockwise from the top
 var segmentPointValues = [...]int{
 	20, 1, 18, 4, 13, 6, 10, 15, 2, 17,
 	3, 19, 7, 16, 8, 11, 14, 9, 12, 5}
+
+//	determineSinglePointValue determines the single point value of a spot on the board,
+//	not taking double and triple rings into account.
 
 //	Use the angle on the board to determine which point wedge has been hit (ignoring double,triple)
 //	Angles come in as numbers between -180 and +180.  We'll convert them to 0 to 360.
@@ -60,6 +67,8 @@ func determineSinglePointValue(radius, degrees float64) int {
 	return segmentPointValues[sliceIndex]
 }
 
+// determineMultiplier determines the multiplier for a spot on the board, based on the radius
+// i.e. whether it's a single, double, treble, or outside the board
 func determineMultiplier(radius float64) int {
 	foundMultiplierIndex := -1
 	for i := 0; i < len(multiplierBoundaries); i++ {

@@ -1,4 +1,4 @@
-package simulation
+package target_search
 
 import (
 	boardgeo "DStratMC/board-geometry"
@@ -14,9 +14,12 @@ import (
 //	random orders are possible and OK.
 
 type TargetSupplier interface {
-	HasNext() bool
-	NextTarget() boardgeo.BoardPosition // Radius, theta
+	HasNext() bool                      // True if there are more targets to return
+	NextTarget() boardgeo.BoardPosition // Radius, theta of next target
 }
+
+// 	CircularTargetSupplierInstance is a simple implementation of TargetSupplier that returns targets
+//	in a circular pattern, starting from the centre and spiralling outwards.
 
 type CircularTargetSupplierInstance struct {
 	nextRadius      float64
@@ -27,6 +30,7 @@ type CircularTargetSupplierInstance struct {
 	imageMinPoint   image.Point
 }
 
+// NewTargetSupplier creates a new instance of CircularTargetSupplierInstance, with the given squareDimension
 func NewTargetSupplier(squareDimension float64, imageMinPoint image.Point) TargetSupplier {
 	instance := &CircularTargetSupplierInstance{
 		nextRadius:      0.0,
@@ -36,19 +40,19 @@ func NewTargetSupplier(squareDimension float64, imageMinPoint image.Point) Targe
 		squareDimension: squareDimension,
 		imageMinPoint:   imageMinPoint,
 	}
-	//fmt.Println("NewTargetSupplier returns", instance)
 	return instance
 }
 
+// HasNext returns true if there are more targets to return
 func (t *CircularTargetSupplierInstance) HasNext() bool {
 	return t.nextRadius <= 1.0
 }
 
+// NextTarget returns the next target in the sequence.
+// To find the next target:
+// 1.  Increment the angle, so we are working our way around the circle at the current distance from centre
+// 2.  If we have gone all the way around, reset the angle to zero and increment the radius
 func (t *CircularTargetSupplierInstance) NextTarget() boardgeo.BoardPosition {
-	//result := boardgeo.BoardPosition{
-	//	Radius: t.nextRadius,
-	//	Angle:  t.nextAngle,
-	//}
 	result := boardgeo.CreateBoardPositionFromPolar(t.nextRadius, t.nextAngle,
 		t.squareDimension)
 	//	Prepare for next results.  Rotate the angle.  At 360 degrees, reset angle to 0 and incrmenet radius

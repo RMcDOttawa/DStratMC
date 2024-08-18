@@ -8,24 +8,26 @@ import (
 )
 
 // UniformAccuracyModel assumes that the result of a throw is evenly distributed in a circle
-//
 //	centered on the target and with a given radius
+
 type UniformAccuracyModel struct {
 	CEPRadius float64
 }
 
+// NewUniformAccuracyModel creates a new instance of the UniformAccuracyModel
 func NewUniformAccuracyModel(CEPRadius float64) AccuracyModel {
 	instance := &UniformAccuracyModel{
 		CEPRadius: CEPRadius,
 	}
-	//fmt.Println("NewUniformAccuracyModel returns", instance)
 	return instance
 }
 
+// GetAccuracyRadius returns the radius of the circle in which the throw will land
 func (p UniformAccuracyModel) GetAccuracyRadius() float64 {
 	return p.CEPRadius
 }
 
+// GetThrow returns the result of a throw, given a target position, a scoring radius, a square dimension, and a starting point
 func (p UniformAccuracyModel) GetThrow(target boardgeo.BoardPosition,
 	scoringRadius float64,
 	squareDimension float64,
@@ -42,6 +44,7 @@ func (p UniformAccuracyModel) GetThrow(target boardgeo.BoardPosition,
 	return result, nil
 }
 
+// GetSigmaRadius is not meaningful for the uniform model
 func (p UniformAccuracyModel) GetSigmaRadius(_ float64) float64 {
 	panic("GetSigmaRadius not meaningful for uniform model")
 	return 0
