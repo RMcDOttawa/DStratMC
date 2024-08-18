@@ -81,8 +81,14 @@ func (u *UserInterfaceInstance) searchProcess(model simulation.AccuracyModel, nu
 // loopThroughAllTargets uses the target supplier iterator to loop through every possible target, and throw
 // a large number of darts at each, recording the average score for each
 func (u *UserInterfaceInstance) loopThroughAllTargets(model simulation.AccuracyModel, numThrows int32, targetSupplier target_search.TargetSupplier, results target_search.SimResults) {
+	u.searchProgressPercent = 0
 	// Loop through all targets
+	targetCount := float64(0)
+	howManyTargetsExpected := targetSupplier.ForecastNumTargets()
 	for targetSupplier.HasNext() {
+		//	Provide visual feedback of what's going on
+		targetCount += 1
+		u.searchProgressPercent = targetCount / howManyTargetsExpected
 		target := targetSupplier.NextTarget()
 		// Mark this target on the dartboard
 		if u.searchShowEachTarget {

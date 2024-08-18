@@ -38,13 +38,14 @@ type UserInterfaceInstance struct {
 	drawTwoSigma               bool
 	drawThreeSigma             bool
 
-	searchShowEachTarget bool
-	searchComplete       bool
-	searchResultStrings  [10]string
-	searchResultsRadio   int
-	searchingBlinkOn     bool
-	cancelBlinkTimer     context.CancelFunc
-	simResultsOneEach    []target_search.OneResult
+	searchShowEachTarget  bool
+	searchProgressPercent float64
+	searchComplete        bool
+	searchResultStrings   [10]string
+	searchResultsRadio    int
+	searchingBlinkOn      bool
+	cancelBlinkTimer      context.CancelFunc
+	simResultsOneEach     []target_search.OneResult
 }
 
 // NewUserInterface creates a new UserInterface object
@@ -135,6 +136,7 @@ func (u *UserInterfaceInstance) leftToolbarLayout() g.Widget {
 		u.uiShowSearchCheckbox(),
 		u.uiLayoutSearchButton(),
 		u.uiLayoutBlinkingSearchNotice(),
+		u.uiLayoutSearchProgressBar(),
 		u.uiLayoutSearchResults(),
 		u.uiLayoutAverageScore(),
 	}
@@ -264,6 +266,17 @@ func (u *UserInterfaceInstance) uiLayoutBlinkingSearchNotice() g.Widget {
 						g.Label("Searching, please wait"),
 					),
 					g.Label("")),
+			}, nil),
+	}
+}
+
+// uiLayoutSearchProgressBar will, If we are doing a search, display a progress bar for search progress
+func (u *UserInterfaceInstance) uiLayoutSearchProgressBar() g.Widget {
+	return g.Layout{
+		g.Condition(u.mode == Mode_SearchNormal,
+			g.Layout{
+				g.Label(""),
+				g.ProgressBar(float32(u.searchProgressPercent)).Size(LeftToolbarMinimumWidth-10, 0),
 			}, nil),
 	}
 }

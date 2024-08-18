@@ -14,8 +14,9 @@ import (
 //	random orders are possible and OK.
 
 type TargetSupplier interface {
-	HasNext() bool                      // True if there are more targets to return
-	NextTarget() boardgeo.BoardPosition // Radius, theta of next target
+	HasNext() bool // True if there are more targets to return
+	NextTarget() boardgeo.BoardPosition
+	ForecastNumTargets() float64
 }
 
 // 	CircularTargetSupplierInstance is a simple implementation of TargetSupplier that returns targets
@@ -30,17 +31,26 @@ type CircularTargetSupplierInstance struct {
 	imageMinPoint   image.Point
 }
 
+const radiusIncrement = 0.02
+const angleIncrement = 0.5
+
 // NewTargetSupplier creates a new instance of CircularTargetSupplierInstance, with the given squareDimension
 func NewTargetSupplier(squareDimension float64, imageMinPoint image.Point) TargetSupplier {
 	instance := &CircularTargetSupplierInstance{
 		nextRadius:      0.0,
 		nextAngle:       0.0,
-		radiusIncrement: 0.02,
-		angleIncrement:  0.5,
+		radiusIncrement: radiusIncrement,
+		angleIncrement:  angleIncrement,
 		squareDimension: squareDimension,
 		imageMinPoint:   imageMinPoint,
 	}
 	return instance
+}
+
+func (t *CircularTargetSupplierInstance) ForecastNumTargets() float64 {
+	numRadiusSteps := 1.0 / t.radiusIncrement
+	numAngleSteps := 360 / t.angleIncrement
+	return numRadiusSteps * numAngleSteps
 }
 
 // HasNext returns true if there are more targets to return
