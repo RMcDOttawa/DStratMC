@@ -133,21 +133,18 @@ func (d *DartboardInstance) SetStdDeviationCirclesCentre(position boardgeo.Board
 
 // SetDrawOneSigma records the information to draw a circle representing 1 standard deviation from centre
 func (d *DartboardInstance) SetDrawOneSigma(draw bool, radius float64) {
-	fmt.Printf("SetDrawOneSigma(%t, %g)\n", draw, radius)
 	d.drawOneStdDeviation = draw
 	d.drawOneStdRadius = radius
 }
 
 // SetDrawTwoSigma records the information to draw a circle representing 2 standard deviations from centre
 func (d *DartboardInstance) SetDrawTwoSigma(draw bool, radius float64) {
-	fmt.Printf("SetDrawTwoSigma(%t, %g)\n", draw, radius)
 	d.drawTwoStdDeviation = draw
 	d.drawTwoStdRadius = radius
 }
 
 // SetDrawThreeSigma records the information to draw a circle representing 3 standard deviations from centre
 func (d *DartboardInstance) SetDrawThreeSigma(draw bool, radius float64) {
-	fmt.Printf("SetDrawThreeSigma(%t, %g)\n", draw, radius)
 	d.drawThreeStdDeviation = draw
 	d.drawThreeStdRadius = radius
 }
