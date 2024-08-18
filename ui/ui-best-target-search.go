@@ -84,6 +84,11 @@ func (u *UserInterfaceInstance) loopThroughAllTargets(model simulation.AccuracyM
 	// Loop through all targets
 	for targetSupplier.HasNext() {
 		target := targetSupplier.NextTarget()
+		// Mark this target on the dartboard
+		if u.searchShowEachTarget {
+			u.dartboard.QueueTargetMarker(target)
+			g.Update()
+		}
 		// Do a large number of throws at this target
 		averageScore, err := u.multipleThrowsAtTarget(target, model, numThrows)
 		if err != nil {

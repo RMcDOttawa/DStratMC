@@ -38,12 +38,13 @@ type UserInterfaceInstance struct {
 	drawTwoSigma               bool
 	drawThreeSigma             bool
 
-	searchComplete      bool
-	searchResultStrings [10]string
-	searchResultsRadio  int
-	searchingBlinkOn    bool
-	cancelBlinkTimer    context.CancelFunc
-	simResultsOneEach   []target_search.OneResult
+	searchShowEachTarget bool
+	searchComplete       bool
+	searchResultStrings  [10]string
+	searchResultsRadio   int
+	searchingBlinkOn     bool
+	cancelBlinkTimer     context.CancelFunc
+	simResultsOneEach    []target_search.OneResult
 }
 
 // NewUserInterface creates a new UserInterface object
@@ -53,6 +54,7 @@ func NewUserInterface(loadedImage *image.RGBA) UserInterface {
 		drawOneSigma:               false,
 		drawTwoSigma:               false,
 		drawThreeSigma:             false,
+		searchShowEachTarget:       true,
 		searchResultStrings:        [10]string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j"},
 		dartboard:                  NewDartboard(),
 		drawReferenceLinesCheckbox: true,
@@ -130,6 +132,7 @@ func (u *UserInterfaceInstance) leftToolbarLayout() g.Widget {
 		//	The following fields may be presented depending on the type of interaction
 		u.uiLayoutNumberOfThrowsField(),
 		u.uiLayoutStdCircleCheckboxes(),
+		u.uiShowSearchCheckbox(),
 		u.uiLayoutSearchButton(),
 		u.uiLayoutBlinkingSearchNotice(),
 		u.uiLayoutSearchResults(),
@@ -206,6 +209,17 @@ func (u *UserInterfaceInstance) uiLayoutStdCircleCheckboxes() g.Widget {
 				g.Checkbox("1 Sigma", &u.drawOneSigma).OnChange(func() { u.dartboard.SetDrawOneSigma(u.drawOneSigma, u.accuracyModel.GetSigmaRadius(1)) }),
 				g.Checkbox("2 Sigma", &u.drawTwoSigma).OnChange(func() { u.dartboard.SetDrawTwoSigma(u.drawTwoSigma, u.accuracyModel.GetSigmaRadius(2)) }),
 				g.Checkbox("3 Sigma", &u.drawThreeSigma).OnChange(func() { u.dartboard.SetDrawThreeSigma(u.drawThreeSigma, u.accuracyModel.GetSigmaRadius(3)) }),
+			}, nil),
+	}
+}
+
+// uiShowSearchCheckbox displays a checkbox that determines whether we show a target marker for the search while in progress
+func (u *UserInterfaceInstance) uiShowSearchCheckbox() g.Widget {
+	return g.Layout{
+		g.Condition(u.mode == Mode_SearchNormal,
+			g.Layout{
+				g.Label(""),
+				g.Checkbox("Show Search", &u.searchShowEachTarget),
 			}, nil),
 	}
 }

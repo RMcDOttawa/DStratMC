@@ -35,8 +35,8 @@ func NewTargetSupplier(squareDimension float64, imageMinPoint image.Point) Targe
 	instance := &CircularTargetSupplierInstance{
 		nextRadius:      0.0,
 		nextAngle:       0.0,
-		radiusIncrement: 0.05,
-		angleIncrement:  1.0,
+		radiusIncrement: 0.02,
+		angleIncrement:  0.5,
 		squareDimension: squareDimension,
 		imageMinPoint:   imageMinPoint,
 	}
