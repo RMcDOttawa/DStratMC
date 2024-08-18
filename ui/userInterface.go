@@ -26,23 +26,24 @@ type UserInterfaceInstance struct {
 	accuracyModel    simulation.AccuracyModel
 	mode             InterfaceMode
 
-	scoreDisplay        string
-	messageDisplay      string
-	searchResultStrings [10]string
-	throwTotal          int64
-	throwCount          int64
-	throwAverage        float64
-	numThrowsField      int32
+	scoreDisplay   string
+	messageDisplay string
+	throwTotal     int64
+	throwCount     int64
+	throwAverage   float64
+	numThrowsField int32
 
 	drawReferenceLinesCheckbox bool
 	drawOneSigma               bool
 	drawTwoSigma               bool
 	drawThreeSigma             bool
 
-	searchComplete    bool
-	searchingBlinkOn  bool
-	cancelBlinkTimer  context.CancelFunc
-	simResultsOneEach []target_search.OneResult
+	searchComplete      bool
+	searchResultStrings [10]string
+	searchResultsRadio  int
+	searchingBlinkOn    bool
+	cancelBlinkTimer    context.CancelFunc
+	simResultsOneEach   []target_search.OneResult
 }
 
 // NewUserInterface creates a new UserInterface object
@@ -278,15 +279,14 @@ func (u *UserInterfaceInstance) uiLayoutSearchResults() g.Widget {
 			}, nil)}
 }
 
-// uiLayoutSearchResultLabels lays out a number of label fields that will be used to display search results
+// uiLayoutSearchResultLabels lays out a number of radio buttons that will be used to display search results
 func (u *UserInterfaceInstance) uiLayoutSearchResultLabels(numLabels int) g.Layout {
 	widgetList := make([]g.Widget, 0, numLabels)
 	for i := 0; i < numLabels; i++ {
-		//thisItem := g.Label(u.searchResultStrings[i])
-		thisItem := g.Button(u.searchResultStrings[i]).
-			OnClick(func() {
-				u.resultButtonClicked(i)
-			})
+		thisItem := g.RadioButton(u.searchResultStrings[i], u.searchResultsRadio == i).OnChange(func() {
+			u.searchResultsRadio = i
+			u.resultButtonClicked(i)
+		})
 		widgetList = append(widgetList, thisItem)
 	}
 	return widgetList
