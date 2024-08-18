@@ -25,12 +25,14 @@ func (u *UserInterfaceInstance) startSearchForBestThrow(model simulation.Accurac
 	g.Update()
 
 	//	Start a process to blink the "searching" label on and off
-	var ctx context.Context
-	ctx, u.cancelBlinkTimer = context.WithCancel(context.Background())
-	go u.cycleBlinkFlag(ctx)
+	var blinkContext context.Context
+	blinkContext, u.cancelBlinkTimer = context.WithCancel(context.Background())
+	go u.cycleBlinkFlag(blinkContext)
 
 	//	Start the actual search process
-	go u.searchProcess(model, numThrows)
+	var searchContext context.Context
+	searchContext, u.cancelSearch = context.WithCancel(context.Background())
+	go u.searchProcess(searchContext, model, numThrows)
 }
 
 // cycleBlinkFlag is the sub-process that cycles the blinking message on and off
@@ -51,58 +53,75 @@ func (u *UserInterfaceInstance) cycleBlinkFlag(ctx context.Context) {
 }
 
 // searchProcess is the subprocess that runs the actual target search.
-func (u *UserInterfaceInstance) searchProcess(model simulation.AccuracyModel, numThrows int32) {
+func (u *UserInterfaceInstance) searchProcess(ctx context.Context, model simulation.AccuracyModel, numThrows int32) {
 	//	Get target iterator and results aggregator
 	targetSupplier := target_search.NewTargetSupplier(u.dartboard.GetSquareDimension(), u.dartboard.GetImageMinPoint())
 	results := target_search.NewSimResults()
+	u.cancelSearchVisible = true
+	u.searchComplete = false
+	g.Update()
 
 	//	Try each target
-	u.loopThroughAllTargets(model, numThrows, targetSupplier, results)
+	u.loopThroughAllTargets(ctx, model, numThrows, targetSupplier, results)
 
-	//	Get results, sorted from best to worst
-	sortedResults := results.GetResultsSortedByHighScore()
+	if u.searchCancelled {
+		u.dartboard.RemoveThrowMarkers()
+		u.searchProgressPercent = 0
+		u.messageDisplay = "Search cancelled"
+	} else {
+		//	Get results, sorted from best to worst
+		sortedResults := results.GetResultsSortedByHighScore()
 
-	//  Filter results so each plain-language target is named only once
-	u.simResultsOneEach = target_search.FilterToOneTargetEach(sortedResults)
+		//  Filter results so each plain-language target is named only once
+		u.simResultsOneEach = target_search.FilterToOneTargetEach(sortedResults)
 
-	// Messages saying what were the best targets
-	u.reportResults()
+		// Messages saying what were the best targets
+		u.reportResults()
 
-	//	Draw best target on the board
-	bestTargetPosition := u.simResultsOneEach[0].Position
-	u.dartboard.SetStdDeviationCirclesCentre(bestTargetPosition)
-	u.dartboard.QueueTargetMarker(bestTargetPosition)
+		//	Draw best target on the board
+		bestTargetPosition := u.simResultsOneEach[0].Position
+		u.dartboard.SetStdDeviationCirclesCentre(bestTargetPosition)
+		u.dartboard.QueueTargetMarker(bestTargetPosition)
+	}
 
 	//	Stop the blink timer
+	u.cancelSearchVisible = false
 	u.cancelBlinkTimer()
 	g.Update()
 }
 
 // loopThroughAllTargets uses the target supplier iterator to loop through every possible target, and throw
 // a large number of darts at each, recording the average score for each
-func (u *UserInterfaceInstance) loopThroughAllTargets(model simulation.AccuracyModel, numThrows int32, targetSupplier target_search.TargetSupplier, results target_search.SimResults) {
+func (u *UserInterfaceInstance) loopThroughAllTargets(ctx context.Context, model simulation.AccuracyModel, numThrows int32, targetSupplier target_search.TargetSupplier, results target_search.SimResults) {
 	u.searchProgressPercent = 0
 	// Loop through all targets
 	targetCount := float64(0)
 	howManyTargetsExpected := targetSupplier.ForecastNumTargets()
 	for targetSupplier.HasNext() {
-		//	Provide visual feedback of what's going on
-		targetCount += 1
-		u.searchProgressPercent = targetCount / howManyTargetsExpected
-		target := targetSupplier.NextTarget()
-		// Mark this target on the dartboard
-		if u.searchShowEachTarget {
-			u.dartboard.QueueTargetMarker(target)
-			g.Update()
+		select {
+		case <-ctx.Done():
+			fmt.Println("Search cancelled")
+			u.searchCancelled = true
+			return
+		default:
+			//	Provide visual feedback of what's going on
+			targetCount += 1
+			u.searchProgressPercent = targetCount / howManyTargetsExpected
+			target := targetSupplier.NextTarget()
+			// Mark this target on the dartboard
+			if u.searchShowEachTarget {
+				u.dartboard.QueueTargetMarker(target)
+				g.Update()
+			}
+			// Do a large number of throws at this target
+			averageScore, err := u.multipleThrowsAtTarget(target, model, numThrows)
+			if err != nil {
+				fmt.Printf("Error throwing at target %v: %v", target, err)
+				continue
+			}
+			//	record result for this target
+			results.AddTargetResult(target, averageScore)
 		}
-		// Do a large number of throws at this target
-		averageScore, err := u.multipleThrowsAtTarget(target, model, numThrows)
-		if err != nil {
-			fmt.Printf("Error throwing at target %v: %v", target, err)
-			continue
-		}
-		//	record result for this target
-		results.AddTargetResult(target, averageScore)
 	}
 }
 

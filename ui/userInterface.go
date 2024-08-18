@@ -44,7 +44,10 @@ type UserInterfaceInstance struct {
 	searchResultStrings   [10]string
 	searchResultsRadio    int
 	searchingBlinkOn      bool
+	cancelSearchVisible   bool
 	cancelBlinkTimer      context.CancelFunc
+	cancelSearch          context.CancelFunc
+	searchCancelled       bool
 	simResultsOneEach     []target_search.OneResult
 }
 
@@ -128,7 +131,7 @@ func (u *UserInterfaceInstance) leftToolbarLayout() g.Widget {
 		// Fields used to select type of interaction and display messages
 		u.uiLayoutInteractionTypeRadioButtons(),
 		u.uiLayoutResetButton(),
-		u.uiLayoutOptionalResultsMessage(),
+		u.uiLayoutResultsMessage(),
 
 		//	The following fields may be presented depending on the type of interaction
 		u.uiLayoutNumberOfThrowsField(),
@@ -137,6 +140,7 @@ func (u *UserInterfaceInstance) leftToolbarLayout() g.Widget {
 		u.uiLayoutSearchButton(),
 		u.uiLayoutBlinkingSearchNotice(),
 		u.uiLayoutSearchProgressBar(),
+		u.uiLayoutCancelSearchButton(),
 		u.uiLayoutSearchResults(),
 		u.uiLayoutAverageScore(),
 	}
@@ -189,15 +193,12 @@ func (u *UserInterfaceInstance) uiLayoutResetButton() g.Widget {
 	}
 }
 
-// uiLayoutOptionalResultsMessage displays a generic message and throw score, if either is nonblanks
-func (u *UserInterfaceInstance) uiLayoutOptionalResultsMessage() g.Widget {
+// uiLayoutOptionalResultsMessage displays a generic message and throw score
+func (u *UserInterfaceInstance) uiLayoutResultsMessage() g.Widget {
 	return g.Layout{
-		g.Condition(u.messageDisplay != "" || u.scoreDisplay != "",
-			g.Layout{
-				g.Label(""),
-				g.Label(u.messageDisplay),
-				g.Label(u.scoreDisplay),
-			}, nil),
+		g.Label(""),
+		g.Label(u.messageDisplay),
+		g.Label(u.scoreDisplay),
 	}
 }
 
@@ -277,6 +278,20 @@ func (u *UserInterfaceInstance) uiLayoutSearchProgressBar() g.Widget {
 			g.Layout{
 				g.Label(""),
 				g.ProgressBar(float32(u.searchProgressPercent)).Size(LeftToolbarMinimumWidth-10, 0),
+			}, nil),
+	}
+}
+
+// uiLayoutCancelSearchButton provides a button to cancel search, once search is running
+func (u *UserInterfaceInstance) uiLayoutCancelSearchButton() g.Widget {
+	return g.Layout{
+		g.Condition(u.cancelSearchVisible,
+			g.Layout{
+				g.Label(""),
+				g.Button("Cancel Search").OnClick(func() {
+					fmt.Println("Cancelling Search")
+					u.cancelSearch()
+				}),
 			}, nil),
 	}
 }
