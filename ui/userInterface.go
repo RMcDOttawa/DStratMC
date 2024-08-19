@@ -236,7 +236,7 @@ func (u *UserInterfaceInstance) uiLayoutStdDevField() g.Widget {
 }
 
 func (u *UserInterfaceInstance) validateAndProcessStdDevField() {
-	if u.stdDevInputField < 0 {
+	if u.stdDevInputField < .00001 {
 		u.stdDevInputField = 0
 		u.messageDisplay = "StdDev must be 0 to 1"
 		return
@@ -274,9 +274,19 @@ func (u *UserInterfaceInstance) uiLayoutNumberOfThrowsField() g.Widget {
 				g.InputInt(&u.numThrowsField).Label("# Throws").
 					Size(numThrowsTextWidth).
 					StepSize(1).
-					StepSizeFast(100),
+					StepSizeFast(100).
+					OnChange(u.validateNumThrowsField),
 			}, nil),
 	}
+}
+
+func (u *UserInterfaceInstance) validateNumThrowsField() {
+	if u.numThrowsField < 1 {
+		u.numThrowsField = throwsAtOneTarget
+		u.messageDisplay = "numTrows must b > 0"
+		return
+	}
+	u.messageDisplay = ""
 }
 
 // uiLayoutSearchButton will, If we are doing a search, offer a "SEARCH" button to begin
