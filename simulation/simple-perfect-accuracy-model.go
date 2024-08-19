@@ -24,6 +24,10 @@ func (p PerfectAccuracyModel) GetSigmaRadius(_ float64) float64 {
 	return 0
 }
 
+func (p PerfectAccuracyModel) SetStandardDeviation(_ float64) {
+	panic("SetStandardDeviation not meaningful for perfect-accuracy model")
+}
+
 // GetAccuracyRadius should never be called with this instance of the accuracy model
 func (p PerfectAccuracyModel) GetAccuracyRadius() float64 {
 	panic("should not have been called")

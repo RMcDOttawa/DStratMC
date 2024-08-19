@@ -49,3 +49,7 @@ func (p UniformAccuracyModel) GetSigmaRadius(_ float64) float64 {
 	panic("GetSigmaRadius not meaningful for uniform model")
 	return 0
 }
+
+func (p UniformAccuracyModel) SetStandardDeviation(_ float64) {
+	panic("SetStandardDeviation not meaningful for uniform model")
+}

@@ -16,4 +16,5 @@ type AccuracyModel interface {
 		startPoint image.Point) (boardgeo.BoardPosition, error)
 	GetAccuracyRadius() float64
 	GetSigmaRadius(numSigmas float64) float64
+	SetStandardDeviation(stdDev float64)
 }

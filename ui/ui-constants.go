@@ -20,17 +20,14 @@ const LeftToolbarMinimumWidth = 200
 const singleHitMarkerRadius = 5
 const multipleHitMarkerRadius = 1
 const numThrowsTextWidth = 120
+const stdDevTextWidth = 64.0
 
 // How many throws are used in a multi-throw averaging run
-const throwsAtOneTarget = 7_500
+const throwsAtOneTarget = 5000
 
 //	Eventually the following will become computed variables:
 
 // the size of the target circle for uniform modeling,
 const uniformCEPRadius = 0.3
-
-// Standard deviation of polar radius, for normal distribution.
-// 2* this deviation would be roughly the same as the CEP radius for uniform distribution
-const normalStdDev = .15
 
 const testCoordinateConversion = true

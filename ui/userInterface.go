@@ -49,6 +49,7 @@ type UserInterfaceInstance struct {
 	cancelSearch          context.CancelFunc
 	searchCancelled       bool
 	simResultsOneEach     []target_search.OneResult
+	stdDevInputField      float32
 }
 
 // NewUserInterface creates a new UserInterface object
@@ -63,6 +64,7 @@ func NewUserInterface(loadedImage *image.RGBA) UserInterface {
 		dartboard:                  NewDartboard(),
 		drawReferenceLinesCheckbox: true,
 		numThrowsField:             throwsAtOneTarget,
+		stdDevInputField:           0.15,
 	}
 	g.EnqueueNewTextureFromRgba(loadedImage, func(t *g.Texture) {
 		instance.dartboardTexture = t
@@ -135,6 +137,7 @@ func (u *UserInterfaceInstance) leftToolbarLayout() g.Widget {
 
 		//	The following fields may be presented depending on the type of interaction
 		u.uiLayoutNumberOfThrowsField(),
+		u.uiLayoutStdDevField(),
 		u.uiLayoutStdCircleCheckboxes(),
 		u.uiShowSearchCheckbox(),
 		u.uiLayoutSearchButton(),
@@ -209,11 +212,45 @@ func (u *UserInterfaceInstance) uiLayoutStdCircleCheckboxes() g.Widget {
 		g.Condition(u.mode == Mode_OneNormal || u.mode == Mode_MultiNormal || u.mode == Mode_SearchNormal,
 			g.Layout{
 				g.Label(""),
+				g.Label("Show circles for:"),
 				g.Checkbox("1 Sigma", &u.drawOneSigma).OnChange(func() { u.dartboard.SetDrawOneSigma(u.drawOneSigma, u.accuracyModel.GetSigmaRadius(1)) }),
 				g.Checkbox("2 Sigma", &u.drawTwoSigma).OnChange(func() { u.dartboard.SetDrawTwoSigma(u.drawTwoSigma, u.accuracyModel.GetSigmaRadius(2)) }),
 				g.Checkbox("3 Sigma", &u.drawThreeSigma).OnChange(func() { u.dartboard.SetDrawThreeSigma(u.drawThreeSigma, u.accuracyModel.GetSigmaRadius(3)) }),
 			}, nil),
 	}
+}
+
+// uiLayoutStdDevField displays a field to enter an floating point number for standard deviation
+func (u *UserInterfaceInstance) uiLayoutStdDevField() g.Widget {
+	return g.Layout{
+		// If we are doing multiple throws, allow the user to set the number of throws
+		g.Condition(u.mode == Mode_OneNormal || u.mode == Mode_MultiNormal || u.mode == Mode_SearchNormal,
+			g.Layout{
+				g.Label(""),
+				g.InputFloat(&u.stdDevInputField).
+					Label("StdDev 0-1").
+					Size(stdDevTextWidth).
+					OnChange(u.validateAndProcessStdDevField),
+			}, nil),
+	}
+}
+
+func (u *UserInterfaceInstance) validateAndProcessStdDevField() {
+	if u.stdDevInputField < 0 {
+		u.stdDevInputField = 0
+		u.messageDisplay = "StdDev must be 0 to 1"
+		return
+	}
+	if u.stdDevInputField > 1 {
+		u.stdDevInputField = 1
+		u.messageDisplay = "StdDev must be 0 to 1"
+		return
+	}
+	u.messageDisplay = ""
+	u.accuracyModel.SetStandardDeviation(float64(u.stdDevInputField))
+	u.dartboard.SetDrawOneSigma(u.drawOneSigma, u.accuracyModel.GetSigmaRadius(1))
+	u.dartboard.SetDrawTwoSigma(u.drawTwoSigma, u.accuracyModel.GetSigmaRadius(2))
+	u.dartboard.SetDrawThreeSigma(u.drawThreeSigma, u.accuracyModel.GetSigmaRadius(3))
 }
 
 // uiShowSearchCheckbox displays a checkbox that determines whether we show a target marker for the search while in progress
@@ -344,11 +381,11 @@ func (u *UserInterfaceInstance) getAccuracyModel(mode InterfaceMode) simulation.
 	case Mode_MultiAvg:
 		return simulation.NewUniformAccuracyModel(uniformCEPRadius)
 	case Mode_OneNormal:
-		return simulation.NewNormalAccuracyModel(normalStdDev)
+		return simulation.NewNormalAccuracyModel(float64(u.stdDevInputField))
 	case Mode_MultiNormal:
-		return simulation.NewNormalAccuracyModel(normalStdDev)
+		return simulation.NewNormalAccuracyModel(float64(u.stdDevInputField))
 	case Mode_SearchNormal:
-		return simulation.NewNormalAccuracyModel(normalStdDev)
+		return simulation.NewNormalAccuracyModel(float64(u.stdDevInputField))
 	default:
 		panic("Invalid radio button value")
 		return simulation.NewPerfectAccuracyModel()
