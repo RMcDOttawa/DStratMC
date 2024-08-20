@@ -17,6 +17,7 @@ const (
 
 // Certain fixed UI sizes that I can't be bothered to figure out how to compute at runtime
 const LeftToolbarMinimumWidth = 200
+const LeftToolbarChildWidth = LeftToolbarMinimumWidth - 15
 const singleHitMarkerRadius = 5
 const multipleHitMarkerRadius = 1
 const numThrowsTextWidth = 120

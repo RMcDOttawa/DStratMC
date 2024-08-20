@@ -131,7 +131,7 @@ func (u *UserInterfaceInstance) leftToolbarLayout() g.Widget {
 		g.Checkbox("Reference Lines", &u.drawReferenceLinesCheckbox).OnChange(func() { u.dartboard.SetDrawRefLines(u.drawReferenceLinesCheckbox) }),
 
 		// Fields used to select type of interaction and display messages
-		u.uiLayoutInteractionTypeRadioButtons(),
+		u.uiLayoutInteractionModePanel(),
 		u.uiLayoutResetButton(),
 		u.uiLayoutResultsMessage(),
 
@@ -149,10 +149,12 @@ func (u *UserInterfaceInstance) leftToolbarLayout() g.Widget {
 	}
 }
 
-// uiLayoutInteractionTypeRadioButtons lays out the radio buttons to select the type of interaction and model
-func (u *UserInterfaceInstance) uiLayoutInteractionTypeRadioButtons() g.Widget {
-	return g.Layout{
-		g.Label(""),
+// uiLayoutInteractionModePanel lays out the radio buttons to select the type of interaction and model
+func (u *UserInterfaceInstance) uiLayoutInteractionModePanel() g.Widget {
+	_, textHeight := g.CalcTextSize("Typical button")
+	radioButtonHeight := textHeight*2 + 2
+	fieldsLayout := g.Layout{
+		g.Label("Interaction Mode:"),
 		g.RadioButton("One Exact", u.mode == Mode_Exact).OnChange(func() {
 			u.mode = Mode_Exact
 			u.accuracyModel = u.getAccuracyModel(u.mode)
@@ -186,6 +188,7 @@ func (u *UserInterfaceInstance) uiLayoutInteractionTypeRadioButtons() g.Widget {
 			u.radioChanged()
 		}),
 	}
+	return g.Child().Border(true).Size(LeftToolbarChildWidth, 4*radioButtonHeight+textHeight).Layout(fieldsLayout)
 }
 
 // uiLayoutResetButton lays out the Reset button in the left toolbar

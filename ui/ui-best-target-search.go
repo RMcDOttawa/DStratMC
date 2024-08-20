@@ -80,6 +80,7 @@ func (u *UserInterfaceInstance) searchProcess(ctx context.Context, model simulat
 
 		//	Draw best target on the board
 		bestTargetPosition := u.simResultsOneEach[0].Position
+		u.searchResultsRadio = 0
 		u.dartboard.SetStdDeviationCirclesCentre(bestTargetPosition)
 		u.dartboard.QueueTargetMarker(bestTargetPosition)
 	}
@@ -123,6 +124,9 @@ func (u *UserInterfaceInstance) loopThroughAllTargets(ctx context.Context, model
 			results.AddTargetResult(target, averageScore)
 		}
 	}
+	// Clear progress bar
+	u.searchProgressPercent = 0
+	g.Update()
 }
 
 // reportResults reports the results of the simulation by console messages and by setting the
