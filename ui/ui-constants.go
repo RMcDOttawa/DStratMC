@@ -23,12 +23,25 @@ const multipleHitMarkerRadius = 1
 const numThrowsTextWidth = 120
 const stdDevTextWidth = 64.0
 
+const uiFramePadVertical = 2
+const uiRadioButtonHeight = 22
+const uiCheckboxHeight = uiRadioButtonHeight
+const uiLabelHeight = 26
+const uiButtonHeight = uiRadioButtonHeight
+const uiInputFieldHeight = 36
+const uiProgressBarHeight = 20
+
 // How many throws are used in a multi-throw averaging run
 const throwsAtOneTarget = 5000
+
+const numSearchResultsToDisplay = 10
 
 //	Eventually the following will become computed variables:
 
 // the size of the target circle for uniform modeling,
 const uniformCEPRadius = 0.3
+
+const MasterWindowWidth = 1000 + LeftToolbarMinimumWidth
+const MasterWindowHeight = 1000
 
 const testCoordinateConversion = true

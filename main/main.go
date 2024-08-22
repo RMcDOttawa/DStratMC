@@ -11,7 +11,8 @@ import (
 var cssStyle []byte
 
 func main() {
-	wnd := g.NewMasterWindow("Dartboard", 1000+ui.LeftToolbarMinimumWidth, 1000, 0)
+	wnd := g.NewMasterWindow("Dartboard", ui.MasterWindowWidth, ui.MasterWindowHeight, 0)
+	wnd.SetSizeLimits(ui.MasterWindowWidth, ui.MasterWindowHeight, 8000, 8000)
 	if err := g.ParseCSSStyleSheet(cssStyle); err != nil {
 		panic(err)
 	}

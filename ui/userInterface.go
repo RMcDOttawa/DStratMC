@@ -9,6 +9,7 @@ import (
 	"fmt"
 	g "github.com/AllenDang/giu"
 	"image"
+	"image/color"
 	"math"
 	"strconv"
 )
@@ -52,10 +53,14 @@ type UserInterfaceInstance struct {
 	stdDevInputField      float32
 }
 
+var panelBorderColour = color.RGBA{100, 100, 100, 255}
+
 // NewUserInterface creates a new UserInterface object
 func NewUserInterface(loadedImage *image.RGBA) UserInterface {
 	instance := &UserInterfaceInstance{
 		mode:                       Mode_OneNormal,
+		messageDisplay:             "",
+		scoreDisplay:               "",
 		drawOneSigma:               false,
 		drawTwoSigma:               false,
 		drawThreeSigma:             false,
@@ -127,32 +132,21 @@ func (u *UserInterfaceInstance) setUpWindow() *g.WindowWidget {
 func (u *UserInterfaceInstance) leftToolbarLayout() g.Widget {
 	u.accuracyModel = u.getAccuracyModel(u.mode)
 	return g.Layout{
-		//	Checkbox controlling whether crosshairs are drawn
-		g.Checkbox("Reference Lines", &u.drawReferenceLinesCheckbox).OnChange(func() { u.dartboard.SetDrawRefLines(u.drawReferenceLinesCheckbox) }),
 
-		// Fields used to select type of interaction and display messages
 		u.uiLayoutInteractionModePanel(),
-		u.uiLayoutResetButton(),
-		u.uiLayoutResultsMessage(),
+		u.uiLayoutMessagesPanel(),
+		u.uiLayoutNumberOfThrowsPanel(),
+		u.uiLayoutNormalInfoPanel(),
+		u.uiSearchControlsPanel(),
 
-		//	The following fields may be presented depending on the type of interaction
-		u.uiLayoutNumberOfThrowsField(),
-		u.uiLayoutStdDevField(),
-		u.uiLayoutStdCircleCheckboxes(),
-		u.uiShowSearchCheckbox(),
-		u.uiLayoutSearchButton(),
-		u.uiLayoutBlinkingSearchNotice(),
-		u.uiLayoutSearchProgressBar(),
-		u.uiLayoutCancelSearchButton(),
 		u.uiLayoutSearchResults(),
 		u.uiLayoutAverageScore(),
 	}
 }
 
-// uiLayoutInteractionModePanel lays out the radio buttons to select the type of interaction and model
+// uiLayoutInteractionModePanel lays out the controls for the overall interaction mode of the UI:
+// radio buttons to select the interaction mode, a checkbox to draw reference lines, and a reset button
 func (u *UserInterfaceInstance) uiLayoutInteractionModePanel() g.Widget {
-	_, textHeight := g.CalcTextSize("Typical button")
-	radioButtonHeight := textHeight*2 + 2
 	fieldsLayout := g.Layout{
 		g.Label("Interaction Mode:"),
 		g.RadioButton("One Exact", u.mode == Mode_Exact).OnChange(func() {
@@ -187,56 +181,151 @@ func (u *UserInterfaceInstance) uiLayoutInteractionModePanel() g.Widget {
 			u.accuracyModel = u.getAccuracyModel(u.mode)
 			u.radioChanged()
 		}),
-	}
-	return g.Child().Border(true).Size(LeftToolbarChildWidth, 4*radioButtonHeight+textHeight).Layout(fieldsLayout)
-}
-
-// uiLayoutResetButton lays out the Reset button in the left toolbar
-func (u *UserInterfaceInstance) uiLayoutResetButton() g.Widget {
-	return g.Layout{
+		g.Label(""),
+		g.Checkbox("Reference Lines", &u.drawReferenceLinesCheckbox).OnChange(func() { u.dartboard.SetDrawRefLines(u.drawReferenceLinesCheckbox) }),
 		g.Label(""),
 		g.Button("Reset").OnClick(u.radioChanged),
 	}
+	const numRadioButtons = 4
+	const numButtons = 1
+	const numLabels = 3
+	const numCheckboxes = 1
+	return g.Style().
+		// Fields inside a bordered panel
+		SetColor(g.StyleColorBorder, panelBorderColour).
+		To(
+			g.Child().Border(true).
+				Size(LeftToolbarChildWidth,
+					numRadioButtons*uiRadioButtonHeight+
+						numButtons*uiButtonHeight+
+						numCheckboxes*uiCheckboxHeight+
+						numLabels*uiLabelHeight).
+				Layout(fieldsLayout),
+		)
 }
 
 // uiLayoutOptionalResultsMessage displays a generic message and throw score
-func (u *UserInterfaceInstance) uiLayoutResultsMessage() g.Widget {
-	return g.Layout{
-		g.Label(""),
+func (u *UserInterfaceInstance) uiLayoutMessagesPanel() g.Widget {
+	fieldsLayout := g.Layout{
 		g.Label(u.messageDisplay),
 		g.Label(u.scoreDisplay),
+	}
+	const numLabelsInsideChild = 2
+	return g.Layout{
+		// Blank line before
+		// Fields inside a bordered panel
+		g.Style().
+			SetColor(g.StyleColorBorder, panelBorderColour).
+			To(
+				g.Child().Border(true).
+					Size(LeftToolbarChildWidth,
+						numLabelsInsideChild*uiLabelHeight).
+					Layout(fieldsLayout),
+			),
+	}
+}
+
+func (u *UserInterfaceInstance) uiLayoutNormalInfoPanel() g.Widget {
+	fieldsLayout := g.Layout{
+		g.Label("Normal Distribution"),
+		g.Label(""),
+		g.InputFloat(&u.stdDevInputField).
+			Label("StdDev 0-1").
+			Size(stdDevTextWidth).
+			OnChange(u.validateAndProcessStdDevField),
+		g.Label(""),
+		g.Label("Show circles for:"),
+		g.Checkbox("1 Sigma", &u.drawOneSigma).OnChange(func() { u.dartboard.SetDrawOneSigma(u.drawOneSigma, u.accuracyModel.GetSigmaRadius(1)) }),
+		g.Checkbox("2 Sigma", &u.drawTwoSigma).OnChange(func() { u.dartboard.SetDrawTwoSigma(u.drawTwoSigma, u.accuracyModel.GetSigmaRadius(2)) }),
+		g.Checkbox("3 Sigma", &u.drawThreeSigma).OnChange(func() { u.dartboard.SetDrawThreeSigma(u.drawThreeSigma, u.accuracyModel.GetSigmaRadius(3)) }),
+	}
+	const numLabels = 4
+	const numCheckboxes = 3
+	return g.Layout{
+		g.Style().
+			// Fields inside a bordered panel
+			SetColor(g.StyleColorBorder, panelBorderColour).
+			SetDisabled(!(u.mode == Mode_OneNormal || u.mode == Mode_MultiNormal || u.mode == Mode_SearchNormal)).
+			To(
+				g.Child().Border(true).
+					Size(LeftToolbarChildWidth,
+						numLabels*uiLabelHeight+
+							numCheckboxes*uiCheckboxHeight+
+							uiInputFieldHeight-20).
+					Layout(fieldsLayout),
+			),
+	}
+}
+
+func (u *UserInterfaceInstance) uiSearchControlsPanel() g.Widget {
+	fieldsLayout := g.Layout{
+		g.Label("Search Controls"),
+		g.Label(""),
+		g.Checkbox("Show Search", &u.searchShowEachTarget),
+		g.Label(""),
+		g.Button("START SEARCH").OnClick(func() {
+			u.startSearchForBestThrow(u.accuracyModel, u.numThrowsField)
+		}),
+		g.ProgressBar(float32(u.searchProgressPercent)).Size(LeftToolbarChildWidth-12, 0),
+		g.Button("Cancel Search").OnClick(func() {
+			fmt.Println("Cancelling Search")
+			u.cancelSearch()
+		}),
+		g.Condition(u.searchingBlinkOn,
+			g.CSSTag("waitlabel").To(
+				g.Label("Searching, please wait"),
+			),
+			g.Label("")),
+	}
+	const numLabels = 4
+	const numCheckboxes = 1
+	const numButtons = 1
+	return g.Layout{
+		g.Style().
+			// Fields inside a bordered panel
+			SetColor(g.StyleColorBorder, panelBorderColour).
+			SetDisabled(u.mode != Mode_SearchNormal).
+			To(
+				g.Child().Border(true).
+					Size(LeftToolbarChildWidth,
+						numLabels*uiLabelHeight+
+							uiProgressBarHeight+
+							numButtons*uiButtonHeight+
+							numCheckboxes*uiCheckboxHeight+12).
+					Layout(fieldsLayout),
+			),
 	}
 }
 
 // uiLayoutStdCircleCheckboxes will, when we are doing normal distribution (and only then) offer 3 checkboxes for drawing reference
 // circles at 1, 2, and 3 standard deviations
-func (u *UserInterfaceInstance) uiLayoutStdCircleCheckboxes() g.Widget {
-	return g.Layout{
-		g.Condition(u.mode == Mode_OneNormal || u.mode == Mode_MultiNormal || u.mode == Mode_SearchNormal,
-			g.Layout{
-				g.Label(""),
-				g.Label("Show circles for:"),
-				g.Checkbox("1 Sigma", &u.drawOneSigma).OnChange(func() { u.dartboard.SetDrawOneSigma(u.drawOneSigma, u.accuracyModel.GetSigmaRadius(1)) }),
-				g.Checkbox("2 Sigma", &u.drawTwoSigma).OnChange(func() { u.dartboard.SetDrawTwoSigma(u.drawTwoSigma, u.accuracyModel.GetSigmaRadius(2)) }),
-				g.Checkbox("3 Sigma", &u.drawThreeSigma).OnChange(func() { u.dartboard.SetDrawThreeSigma(u.drawThreeSigma, u.accuracyModel.GetSigmaRadius(3)) }),
-			}, nil),
-	}
-}
+//func (u *UserInterfaceInstance) uiLayoutStdCircleCheckboxes() g.Widget {
+//	return g.Layout{
+//		g.Condition(u.mode == Mode_OneNormal || u.mode == Mode_MultiNormal || u.mode == Mode_SearchNormal,
+//			g.Layout{
+//				g.Label(""),
+//				g.Label("Show circles for:"),
+//				g.Checkbox("1 Sigma", &u.drawOneSigma).OnChange(func() { u.dartboard.SetDrawOneSigma(u.drawOneSigma, u.accuracyModel.GetSigmaRadius(1)) }),
+//				g.Checkbox("2 Sigma", &u.drawTwoSigma).OnChange(func() { u.dartboard.SetDrawTwoSigma(u.drawTwoSigma, u.accuracyModel.GetSigmaRadius(2)) }),
+//				g.Checkbox("3 Sigma", &u.drawThreeSigma).OnChange(func() { u.dartboard.SetDrawThreeSigma(u.drawThreeSigma, u.accuracyModel.GetSigmaRadius(3)) }),
+//			}, nil),
+//	}
+//}
 
 // uiLayoutStdDevField displays a field to enter an floating point number for standard deviation
-func (u *UserInterfaceInstance) uiLayoutStdDevField() g.Widget {
-	return g.Layout{
-		// If we are doing multiple throws, allow the user to set the number of throws
-		g.Condition(u.mode == Mode_OneNormal || u.mode == Mode_MultiNormal || u.mode == Mode_SearchNormal,
-			g.Layout{
-				g.Label(""),
-				g.InputFloat(&u.stdDevInputField).
-					Label("StdDev 0-1").
-					Size(stdDevTextWidth).
-					OnChange(u.validateAndProcessStdDevField),
-			}, nil),
-	}
-}
+//func (u *UserInterfaceInstance) uiLayoutStdDevField() g.Widget {
+//	return g.Layout{
+//		// If we are doing multiple throws, allow the user to set the number of throws
+//		g.Condition(u.mode == Mode_OneNormal || u.mode == Mode_MultiNormal || u.mode == Mode_SearchNormal,
+//			g.Layout{
+//				g.Label(""),
+//				g.InputFloat(&u.stdDevInputField).
+//					Label("StdDev 0-1").
+//					Size(stdDevTextWidth).
+//					OnChange(u.validateAndProcessStdDevField),
+//			}, nil),
+//	}
+//}
 
 func (u *UserInterfaceInstance) validateAndProcessStdDevField() {
 	if u.stdDevInputField < .00001 {
@@ -257,29 +346,39 @@ func (u *UserInterfaceInstance) validateAndProcessStdDevField() {
 }
 
 // uiShowSearchCheckbox displays a checkbox that determines whether we show a target marker for the search while in progress
-func (u *UserInterfaceInstance) uiShowSearchCheckbox() g.Widget {
-	return g.Layout{
-		g.Condition(u.mode == Mode_SearchNormal,
-			g.Layout{
-				g.Label(""),
-				g.Checkbox("Show Search", &u.searchShowEachTarget),
-			}, nil),
-	}
-}
+//func (u *UserInterfaceInstance) uiShowSearchCheckbox() g.Widget {
+//	return g.Layout{
+//		g.Condition(u.mode == Mode_SearchNormal,
+//			g.Layout{
+//				g.Label(""),
+//				g.Checkbox("Show Search", &u.searchShowEachTarget),
+//			}, nil),
+//	}
+//}
 
 // uiLayoutNumberOfThrowsField displays a field to enter an integer number of throws
-func (u *UserInterfaceInstance) uiLayoutNumberOfThrowsField() g.Widget {
-	return g.Layout{
+func (u *UserInterfaceInstance) uiLayoutNumberOfThrowsPanel() g.Widget {
+	fieldsLayout := g.Layout{
 		// If we are doing multiple throws, allow the user to set the number of throws
-		g.Condition(u.mode == Mode_MultiAvg || u.mode == Mode_MultiNormal || u.mode == Mode_SearchNormal,
-			g.Layout{
-				g.Label(""),
-				g.InputInt(&u.numThrowsField).Label("# Throws").
-					Size(numThrowsTextWidth).
-					StepSize(1).
-					StepSizeFast(100).
-					OnChange(u.validateNumThrowsField),
-			}, nil),
+		//g.Condition(u.mode == Mode_MultiAvg || u.mode == Mode_MultiNormal || u.mode == Mode_SearchNormal,
+		// Fields inside a bordered panel
+		g.InputInt(&u.numThrowsField).Label("Throws").
+			Size(numThrowsTextWidth).
+			StepSize(1).
+			StepSizeFast(100).
+			OnChange(u.validateNumThrowsField),
+	}
+	return g.Layout{
+		g.Style().
+			// Fields inside a bordered panel
+			SetColor(g.StyleColorBorder, panelBorderColour).
+			SetDisabled(!(u.mode == Mode_MultiNormal || u.mode == Mode_SearchNormal)).
+			To(
+				g.Child().Border(true).
+					Size(LeftToolbarChildWidth,
+						uiInputFieldHeight).
+					Layout(fieldsLayout),
+			),
 	}
 }
 
@@ -293,58 +392,47 @@ func (u *UserInterfaceInstance) validateNumThrowsField() {
 }
 
 // uiLayoutSearchButton will, If we are doing a search, offer a "SEARCH" button to begin
-func (u *UserInterfaceInstance) uiLayoutSearchButton() g.Widget {
-	return g.Layout{
-		g.Condition(u.mode == Mode_SearchNormal,
-			g.Layout{
-				g.Label(""),
-				g.Button("SEARCH").OnClick(func() {
-					u.startSearchForBestThrow(u.accuracyModel, u.numThrowsField)
-				}),
-			}, nil),
-	}
-}
+//func (u *UserInterfaceInstance) uiLayoutSearchButton() g.Widget {
+//	return g.Layout{
+//		g.Condition(u.mode == Mode_SearchNormal,
+//			g.Layout{
+//				g.Label(""),
+//				g.Button("SEARCH").OnClick(func() {
+//					u.startSearchForBestThrow(u.accuracyModel, u.numThrowsField)
+//				}),
+//			}, nil),
+//	}
+//}
 
 // uiLayoutBlinkingSearchNotice displays a "searching please wait" message that blinks on and
 // off (blinking caused by displaying the message dependent on a flag being toggled by a background process)
-func (u *UserInterfaceInstance) uiLayoutBlinkingSearchNotice() g.Widget {
-	return g.Layout{
-		g.Condition(u.mode == Mode_SearchNormal,
-			g.Layout{
-				g.Label(""),
-				g.Condition(u.searchingBlinkOn,
-					g.CSSTag("waitlabel").To(
-						g.Label("Searching, please wait"),
-					),
-					g.Label("")),
-			}, nil),
-	}
-}
-
-// uiLayoutSearchProgressBar will, If we are doing a search, display a progress bar for search progress
-func (u *UserInterfaceInstance) uiLayoutSearchProgressBar() g.Widget {
-	return g.Layout{
-		g.Condition(u.mode == Mode_SearchNormal,
-			g.Layout{
-				g.Label(""),
-				g.ProgressBar(float32(u.searchProgressPercent)).Size(LeftToolbarMinimumWidth-10, 0),
-			}, nil),
-	}
-}
+//func (u *UserInterfaceInstance) uiLayoutBlinkingSearchNotice() g.Widget {
+//	return g.Layout{
+//		g.Condition(u.mode == Mode_SearchNormal,
+//			g.Layout{
+//				g.Label(""),
+//				g.Condition(u.searchingBlinkOn,
+//					g.CSSTag("waitlabel").To(
+//						g.Label("Searching, please wait"),
+//					),
+//					g.Label("")),
+//			}, nil),
+//	}
+//}
 
 // uiLayoutCancelSearchButton provides a button to cancel search, once search is running
-func (u *UserInterfaceInstance) uiLayoutCancelSearchButton() g.Widget {
-	return g.Layout{
-		g.Condition(u.cancelSearchVisible,
-			g.Layout{
-				g.Label(""),
-				g.Button("Cancel Search").OnClick(func() {
-					fmt.Println("Cancelling Search")
-					u.cancelSearch()
-				}),
-			}, nil),
-	}
-}
+//func (u *UserInterfaceInstance) uiLayoutCancelSearchButton() g.Widget {
+//	return g.Layout{
+//		g.Condition(u.cancelSearchVisible,
+//			g.Layout{
+//				g.Label(""),
+//				g.Button("Cancel Search").OnClick(func() {
+//					fmt.Println("Cancelling Search")
+//					u.cancelSearch()
+//				}),
+//			}, nil),
+//	}
+//}
 
 // uiLayoutAverageScore displays the average score from non-search clicks
 func (u *UserInterfaceInstance) uiLayoutAverageScore() g.Widget {
@@ -365,9 +453,9 @@ func (u *UserInterfaceInstance) uiLayoutSearchResults() g.Widget {
 	return g.Layout{
 		g.Condition(u.mode == Mode_SearchNormal && u.searchComplete,
 			g.Layout{
-				g.Label("Best 10 throws:"),
+				g.Label(fmt.Sprintf("Best %d throws:", numSearchResultsToDisplay)),
 				g.Label(""),
-				u.uiLayoutSearchResultLabels(10),
+				u.uiLayoutSearchResultLabels(numSearchResultsToDisplay),
 			}, nil)}
 }
 
