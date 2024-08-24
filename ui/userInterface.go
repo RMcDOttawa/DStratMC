@@ -93,7 +93,7 @@ func NewUserInterface(loadedImage *image.RGBA) UserInterface {
 	return instance
 }
 
-// MainUiLoop is the main loop for the user interface. This called from the master window's Run method,
+// MainUiLoop is the mac-binary loop for the user interface. This called from the master window's Run method,
 // 30 times a second repeatedly.  The GIU ui framework does not store state, so we are responsible for
 // storing state information for anything that is to be displayed that seems to be constant on the screen
 
@@ -360,17 +360,6 @@ func (u *UserInterfaceInstance) validateAndProcessStdDevField() {
 	u.dartboard.SetDrawThreeSigma(u.drawThreeSigma, u.accuracyModel.GetSigmaRadius(3))
 }
 
-// uiShowSearchCheckbox displays a checkbox that determines whether we show a target marker for the search while in progress
-//func (u *UserInterfaceInstance) uiShowSearchCheckbox() g.Widget {
-//	return g.Layout{
-//		g.Condition(u.mode == Mode_SearchNormal,
-//			g.Layout{
-//				g.Label(""),
-//				g.Checkbox("Show Search", &u.searchShowEachTarget),
-//			}, nil),
-//	}
-//}
-
 // uiLayoutNumberOfThrowsField displays a field to enter an integer number of throws
 func (u *UserInterfaceInstance) uiLayoutNumberOfThrowsPanel() g.Widget {
 	fieldsLayout := g.Layout{
@@ -406,49 +395,6 @@ func (u *UserInterfaceInstance) validateNumThrowsField() {
 	u.messageDisplay = ""
 }
 
-// uiLayoutSearchButton will, If we are doing a search, offer a "SEARCH" button to begin
-//func (u *UserInterfaceInstance) uiLayoutSearchButton() g.Widget {
-//	return g.Layout{
-//		g.Condition(u.mode == Mode_SearchNormal,
-//			g.Layout{
-//				g.Label(""),
-//				g.Button("SEARCH").OnClick(func() {
-//					u.startSearchForBestThrow(u.accuracyModel, u.numThrowsField)
-//				}),
-//			}, nil),
-//	}
-//}
-
-// uiLayoutBlinkingSearchNotice displays a "searching please wait" message that blinks on and
-// off (blinking caused by displaying the message dependent on a flag being toggled by a background process)
-//func (u *UserInterfaceInstance) uiLayoutBlinkingSearchNotice() g.Widget {
-//	return g.Layout{
-//		g.Condition(u.mode == Mode_SearchNormal,
-//			g.Layout{
-//				g.Label(""),
-//				g.Condition(u.searchingBlinkOn,
-//					g.CSSTag("waitlabel").To(
-//						g.Label("Searching, please wait"),
-//					),
-//					g.Label("")),
-//			}, nil),
-//	}
-//}
-
-// uiLayoutCancelSearchButton provides a button to cancel search, once search is running
-//func (u *UserInterfaceInstance) uiLayoutCancelSearchButton() g.Widget {
-//	return g.Layout{
-//		g.Condition(u.cancelSearchVisible,
-//			g.Layout{
-//				g.Label(""),
-//				g.Button("Cancel Search").OnClick(func() {
-//					fmt.Println("Cancelling Search")
-//					u.cancelSearch()
-//				}),
-//			}, nil),
-//	}
-//}
-
 // uiLayoutAverageScore displays the average score from non-search clicks
 func (u *UserInterfaceInstance) uiLayoutAverageScore() g.Widget {
 	return g.Layout{
@@ -468,8 +414,7 @@ func (u *UserInterfaceInstance) uiLayoutSearchResults() g.Widget {
 	return g.Layout{
 		g.Condition(u.mode == Mode_SearchNormal && u.searchComplete,
 			g.Layout{
-				g.Label(fmt.Sprintf("Best %d throws:", numSearchResultsToDisplay)),
-				g.Label(""),
+				g.Label(fmt.Sprintf("Best %d targets:", numSearchResultsToDisplay)),
 				u.uiLayoutSearchResultLabels(numSearchResultsToDisplay),
 			}, nil)}
 }
@@ -522,7 +467,7 @@ func (u *UserInterfaceInstance) radioChanged() {
 	u.circleDrawMode = circleDrawModeNone
 }
 
-// dartboardClickCallback is called when the user clicks on the dartboard. It is the main entry point for
+// dartboardClickCallback is called when the user clicks on the dartboard. It is the mac-binary entry point for
 // the UI to respond to user input
 func (u *UserInterfaceInstance) dartboardClickCallback(dartboard Dartboard, position boardgeo.BoardPosition) {
 	// This is a good place to verify that coordinate conversion is working

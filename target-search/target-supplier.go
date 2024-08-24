@@ -31,8 +31,8 @@ type CircularTargetSupplierInstance struct {
 	imageMinPoint   image.Point
 }
 
-const radiusIncrement = 0.02
-const angleIncrement = 0.5
+const radiusIncrement = 0.01
+const angleIncrement = 0.25
 
 // NewTargetSupplier creates a new instance of CircularTargetSupplierInstance, with the given squareDimension
 func NewTargetSupplier(squareDimension float64, imageMinPoint image.Point) TargetSupplier {

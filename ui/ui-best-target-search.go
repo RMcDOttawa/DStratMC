@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-//	startSearchForBestThrow begins the search.  We spawn two sub-processes, to keep this, the main process,
+//	startSearchForBestThrow begins the search.  We spawn two sub-processes, to keep this, the mac-binary process,
 //	running to keep the UI responsive.  One subprocess is the actual search, and the other cycles the flag
 //	that displays the "searching, please wait" message on and off periodically
 
@@ -59,6 +59,8 @@ func (u *UserInterfaceInstance) searchProcess(ctx context.Context, model simulat
 	results := target_search.NewSimResults()
 	u.cancelSearchVisible = true
 	u.searchComplete = false
+	u.messageDisplay = ""
+	u.scoreDisplay = ""
 	g.Update()
 
 	//	Try each target
@@ -132,7 +134,6 @@ func (u *UserInterfaceInstance) loopThroughAllTargets(ctx context.Context, model
 // reportResults reports the results of the simulation by console messages and by setting the
 // ui variables that will be displayed for the best 10 targets
 func (u *UserInterfaceInstance) reportResults() {
-	fmt.Println("First 10 best choices, from best down:")
 	for i := 0; i < 10; i++ {
 		_, score, description := boardgeo.DescribeBoardPoint(u.simResultsOneEach[i].Position)
 		fmt.Printf("   %s (theoretical score %d, average %g)\n", description, score, u.simResultsOneEach[i].Score)

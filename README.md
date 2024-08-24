@@ -25,10 +25,14 @@ threshold point where aiming for treble-20 or treble-19 is, statistically, the s
 there other good areas on the board to aim at?</li>
 </ul>
 <p>This seemed like a good use of a Monte Carlo technique: a program that simulates 
-throwing a large number of darts at a target and, using a model that simulates a player's accuracy, calculates an average score.  Then, the program can throw a large number of darts at each of a large number of targets, and find the high-scoring areas on the board.
+throwing a large number of darts at a target and, using a model that simulates a player's 
+accuracy, calculates an average score.  Then, the program can throw a large number of darts 
+at each of a large number of targets around the board, and find the high-scoring areas on the board.
+<p>To be clear: this program isn't intended as a darts coach - it was a programming exercise
+for fun, and to demonstrate certain techniques.
 <h2>Instructions</h2>
 Run the program in your GO IDE - or use the compiled binary if there is one available 
-for your platform.  To run from the IDE, run the main/main.go file.
+for your platform. (Look in the /binaries directory.)  To run from the IDE, run the main/main.go file.
 <p>You will see a dartboard on the right and a set of controls on the left.
 <p>The "Interaction Mode" radio buttons control the overall behaviour of the program - 
 especially what happens when you click the mouse on the board.
@@ -83,6 +87,7 @@ where 1, 2, and 3 standard deviations lie from your target point. According to t
 about 68% of your throws will land within the 1 standard deviation circle, about 95% within
 the 2 standard deviation circle, and about 99.7% within the 3 standard deviation circle.
 With a large number of throws, a few will even fall outside that circle - wild darts do happen.
+<p>The 2-sigma circle corresponds to what most people would naturally say is their "circle of accuracy".
 <h2>Future Feature</h2>
 <p>Right now, you have to enter the Standard Deviation figure manually.
 <ul>
@@ -94,7 +99,8 @@ and misses the board entirely from time to time</li>
 </ul>
 <p>Future releases of this program will:
 <ul>
-<li>Allow you to <i>draw</i> your circle of accuracy on the board instead of having to
+<li>Allow you to <i>draw</i> your circle of accuracy on the board
+(actually, draw the 2-sigma circle) instead of having to
 type in a number, and </li>
 <li>Measure your own standard deviation by telling the program what target you are aiming
 for, then clicking where your dart actually lands. Throwing 20 or so darts this way will give
