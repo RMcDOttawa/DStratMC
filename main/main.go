@@ -2,13 +2,17 @@ package main
 
 import (
 	"DStratMC/ui"
+	"bytes"
 	_ "embed"
-	"fmt"
 	g "github.com/AllenDang/giu"
+	"image"
 )
 
 //go:embed style.css
 var cssStyle []byte
+
+//go:embed DartboardIllustration.png
+var imageBytes []byte
 
 func main() {
 	wnd := g.NewMasterWindow("Dartboard", ui.MasterWindowWidth, ui.MasterWindowHeight, 0)
@@ -16,11 +20,13 @@ func main() {
 	if err := g.ParseCSSStyleSheet(cssStyle); err != nil {
 		panic(err)
 	}
-	loadedImage, err := g.LoadImage("./Dartboard Illustration.png")
+	//fmt.Println("Embedded # bytes", len(imageBytes))
+	img, _, err := image.Decode(bytes.NewReader(imageBytes))
 	if err != nil {
-		fmt.Println("Unable to load dartboard image:", err)
-		return
+		panic(err)
 	}
+	//fmt.Println("Converted to image:", img.Bounds())
+	loadedImage := g.ImageToRgba(img)
 	userInterface := ui.NewUserInterface(loadedImage)
 	wnd.Run(userInterface.MainUiLoop)
 

@@ -20,6 +20,14 @@ type UserInterface interface {
 	MainUiLoop()
 }
 
+type circleDrawMode int
+
+const (
+	circleDrawModeNone circleDrawMode = iota
+	circleDrawModeStart
+	circleDrawModeTrack
+)
+
 // UserInterfaceInstance is the attribute data stored with the UI object
 type UserInterfaceInstance struct {
 	dartboardTexture *g.Texture
@@ -51,6 +59,10 @@ type UserInterfaceInstance struct {
 	searchCancelled       bool
 	simResultsOneEach     []target_search.OneResult
 	stdDevInputField      float32
+
+	// Drawing circle to represent standard deviation
+	circleDrawMode   circleDrawMode
+	circleDrawCentre boardgeo.BoardPosition
 }
 
 var panelBorderColour = color.RGBA{100, 100, 100, 255}
@@ -70,6 +82,7 @@ func NewUserInterface(loadedImage *image.RGBA) UserInterface {
 		drawReferenceLinesCheckbox: true,
 		numThrowsField:             throwsAtOneTarget,
 		stdDevInputField:           0.15,
+		circleDrawMode:             circleDrawModeNone,
 	}
 	g.EnqueueNewTextureFromRgba(loadedImage, func(t *g.Texture) {
 		instance.dartboardTexture = t
@@ -233,6 +246,7 @@ func (u *UserInterfaceInstance) uiLayoutNormalInfoPanel() g.Widget {
 			Label("StdDev 0-1").
 			Size(stdDevTextWidth).
 			OnChange(u.validateAndProcessStdDevField),
+		g.Button("Draw Std-Dev").OnClick(u.StartDrawStdDevMode),
 		g.Label(""),
 		g.Label("Show circles for:"),
 		g.Checkbox("1 Sigma", &u.drawOneSigma).OnChange(func() { u.dartboard.SetDrawOneSigma(u.drawOneSigma, u.accuracyModel.GetSigmaRadius(1)) }),
@@ -251,6 +265,7 @@ func (u *UserInterfaceInstance) uiLayoutNormalInfoPanel() g.Widget {
 					Size(LeftToolbarChildWidth,
 						numLabels*uiLabelHeight+
 							numCheckboxes*uiCheckboxHeight+
+							uiButtonHeight+
 							uiInputFieldHeight-20).
 					Layout(fieldsLayout),
 			),
@@ -504,6 +519,7 @@ func (u *UserInterfaceInstance) radioChanged() {
 	u.dartboard.RemoveThrowMarkers()
 	u.searchComplete = false
 	u.searchingBlinkOn = false
+	u.circleDrawMode = circleDrawModeNone
 }
 
 // dartboardClickCallback is called when the user clicks on the dartboard. It is the main entry point for
@@ -529,6 +545,17 @@ func (u *UserInterfaceInstance) dartboardClickCallback(dartboard Dartboard, posi
 		u.messageDisplay = ""
 		u.scoreDisplay = ""
 		dartboard.RemoveThrowMarkers()
+		// If the board is clicked when we are in "start drawing std dev circle" mode, we
+		// will record this position as the centre and start tracking the diameter as the
+		// mouse is dragged.
+		if u.circleDrawMode == circleDrawModeStart {
+			u.circleDrawMode = circleDrawModeTrack
+			u.circleDrawCentre = position
+			fmt.Println("Beginning circle tracking at centre", position)
+			return
+		}
+
+		//	If it wasn't "start drawing circle" mode, we just take this as a throw marker
 		switch u.mode {
 		case Mode_Exact:
 			dartboard.QueueTargetMarker(position)
@@ -549,4 +576,14 @@ func (u *UserInterfaceInstance) dartboardClickCallback(dartboard Dartboard, posi
 			panic("Invalid radio button value")
 		}
 	}
+}
+
+// StartDrawStdDevMode is called when the "Draw Standard Deviation" button is clicked
+// We set a flag causing the next mouse click to be used to draw a circle representing the
+// 2-standard deviation circle for the normal distribution
+func (u *UserInterfaceInstance) StartDrawStdDevMode() {
+	u.messageDisplay = "Click & drag 95% circle"
+	u.scoreDisplay = ""
+	u.circleDrawMode = circleDrawModeStart
+	g.Update()
 }
