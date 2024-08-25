@@ -39,18 +39,28 @@ especially what happens when you click the mouse on the board.
 <table>
 <thead>
 <tr>
-<td width="200px"><b>Mode</b></td>
+<td ><b>Mode</b></td>
 <td><b>Behaviour</b></td>
 </thead>
 <tbody>
-	<tr valign="top">
+	<tr style="vertical-align: top;">
 		<td>One Throw Exact</td>
 		<td>When you click on the board, you get feedback of the dart landing exactly
 			where you aimed it, and the resulting score. This is not useful for anything except 
 			verifying that the UI and interaction are working.</td>
 	</tr>
-	<tr valign="top">
-		<td width="200px">One Throw Normal</td>
+	<tr style="vertical-align: top;">
+		<td style="width: 20%">Draw 95% circle</td>
+		<td>Allows you to define your own accuracy circle by clicking and dragging on the board. Click and
+drag a circle that is the size of the accuracy you usually get - ignore the odd wild throw.
+For example, if you aim for treble 20 but often fall into the 1 or 5, scoring the hated
+26 on three darts, you could click in the treble 20 and drag out a circle that includes
+some of the 1 and 5 segments.  This circle is twice the standard deviation that will
+be used for modeling throws, since a 2 * standard deviation circle will include
+95% of the random throws.</td>
+	</tr>
+	<tr style="vertical-align: top;">
+		<td >One Throw Normal</td>
 		<td>Simulates throwing a dart that falls in an area determined by your degree of accuracy. 
 		The possible landing spots are centered on the target where you click, and the amount 
 		of variation from that spot is determined by your "standard deviation", which you
@@ -63,8 +73,8 @@ especially what happens when you click the mouse on the board.
 		word "Normal" is referring to in the interaction modes.
 		</td>
 	</tr>
-	<tr valign="top">
-		<td width="200px">Multi Throw Normal</td>
+	<tr style="vertical-align: top;">
+		<td >Multi Throw Normal</td>
 		<td>In this mode, when you click on the board, a large number of darts are thrown
 		at the target, landing with the same normal distribution.  The number of darts
 		thrown can be entered in the field labeled "throws".
@@ -72,8 +82,8 @@ especially what happens when you click the mouse on the board.
 		the normal distribution - the darts land in a circle around your target, with 
 		more toward the centre.</td>
 	</tr>
-	<tr valign="top">
-		<td width="200px">Search Normal</td>
+	<tr style="vertical-align: top;">
+		<td >Search Normal</td>
 		<td>Finally, with this setting, you don't click on the board. Instead, just click
 		on the "search" button. The program will throw a large number of darts at many locations
 		around the board, and will report back to you on the location of the 10 best throws.</td>
@@ -89,20 +99,9 @@ the 2 standard deviation circle, and about 99.7% within the 3 standard deviation
 With a large number of throws, a few will even fall outside that circle - wild darts do happen.
 <p>The 2-sigma circle corresponds to what most people would naturally say is their "circle of accuracy".
 <h2>Future Feature</h2>
-<p>Right now, you have to enter the Standard Deviation figure manually.
-<ul>
-<li>Less than 0.1 is a darn good player.</li>
-<li>0.1 is a good player like the guy at the pub that you can't beat.</li>
-<li>0.2 is a beginner with some experience, starting to hit what they aim for fairly often.</li>
-<li>0.3 is a true beginner who doesn't really have that much control over where their darts land, 
-and misses the board entirely from time to time</li>
-</ul>
 <p>Future releases of this program will:
 <ul>
-<li>Allow you to <i>draw</i> your circle of accuracy on the board
-(actually, draw the 2-sigma circle) instead of having to
-type in a number, and </li>
-<li>Measure your own standard deviation by telling the program what target you are aiming
+<li>Measure your own standard deviation empirically by telling the program what target you are aiming
 for, then clicking where your dart actually lands. Throwing 20 or so darts this way will give
 a good working figure of your own personal standard deviation.</li>
 </ul>

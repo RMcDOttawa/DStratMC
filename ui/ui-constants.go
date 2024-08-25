@@ -13,6 +13,7 @@ const (
 	Mode_OneNormal                         // Record one hit normally distributed within a circle
 	Mode_MultiNormal                       // Record multiple hits normally distributed within a circle
 	Mode_SearchNormal                      // Search around the board, recording result of multi-normal at each search location
+	Mode_DrawCircle                        // Draw the 2-sigma (95%) standard deviation circle
 )
 
 // Certain fixed UI sizes that I can't be bothered to figure out how to compute at runtime

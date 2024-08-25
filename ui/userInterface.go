@@ -20,12 +20,12 @@ type UserInterface interface {
 	MainUiLoop()
 }
 
-type circleDrawMode int
+type drawCircleState int
 
 const (
-	circleDrawModeNone circleDrawMode = iota
-	circleDrawModeStart
-	circleDrawModeTrack
+	drawCircleStateOff drawCircleState = iota
+	drawCircleStateStart
+	drawCircleStateDrawing
 )
 
 // UserInterfaceInstance is the attribute data stored with the UI object
@@ -61,8 +61,10 @@ type UserInterfaceInstance struct {
 	stdDevInputField      float32
 
 	// Drawing circle to represent standard deviation
-	circleDrawMode   circleDrawMode
-	circleDrawCentre boardgeo.BoardPosition
+	circleDrawingState drawCircleState
+	squareDimension    float64
+	dartboardImageMin  image.Point
+	dartboardImageMax  image.Point
 }
 
 var panelBorderColour = color.RGBA{100, 100, 100, 255}
@@ -82,7 +84,7 @@ func NewUserInterface(loadedImage *image.RGBA) UserInterface {
 		drawReferenceLinesCheckbox: true,
 		numThrowsField:             throwsAtOneTarget,
 		stdDevInputField:           0.15,
-		circleDrawMode:             circleDrawModeNone,
+		circleDrawingState:         drawCircleStateOff,
 	}
 	g.EnqueueNewTextureFromRgba(loadedImage, func(t *g.Texture) {
 		instance.dartboardTexture = t
@@ -106,6 +108,76 @@ func (u *UserInterfaceInstance) MainUiLoop() {
 		g.Custom(u.dartboard.DrawFunction),
 	)
 
+	//	Click Callbacks are processed only when the mouse is released.  Because, for purposes of
+	//  tracing the standard deviation circle, we want to handle the cases of the mouse first
+	//  being clicked, and dragging while down, we will test for those cases here after the
+	//  usual UI processing.
+	if u.circleDrawingState != drawCircleStateOff {
+		// We are in some kind of circle drawing state
+		u.handleDrawingCircle()
+		return
+	}
+
+}
+
+//		If we have started "draw circle" mode, we will trace a circle on the dartboard as long
+//	 as the mouse button is down
+func (u *UserInterfaceInstance) handleDrawingCircle() {
+	mousePosition := boardgeo.CreateBoardPositionFromXY(g.GetMousePos(), u.squareDimension,
+		u.dartboardImageMin)
+
+	//fmt.Println("Handling circle drawing, state: ", u.circleDrawingState)
+	//fmt.Println("  Mouse position: ", mousePosition)
+	//  We are in "draw circle" mode.
+	//  There are 3 states of interest
+	//  1. Start mode and mouse is down:  We record the center of the circle
+	//		for drawing the next time through the loop after the mouse has moved a bit.
+	//		Go to "Drawing" mode to start drawing on the next iteration.
+	//  2. Drawing mode and mouse is still down: keep drawing, stay in drawing mode
+	//  3. Drawing mode and mouse is released:  stop drawing, store result, set mode = off
+	//		We handle this case in the real click callback routine
+
+	//  1. Start mode and mouse is down:  We record the center point for the circle and set mode = drawing
+	if u.circleDrawingState == drawCircleStateStart && g.IsMouseDown(g.MouseButtonLeft) {
+		//fmt.Println("   First event for circle drawing. Set center to", mousePosition)
+		u.circleDrawingState = drawCircleStateDrawing
+		u.dartboard.StartTracingCircleAtCenter(mousePosition)
+		return
+	}
+
+	//  2. Drawing mode and mouse is still down: keep drawing, stay in drawing mode
+	if u.circleDrawingState == drawCircleStateDrawing && g.IsMouseDown(g.MouseButtonLeft) {
+		if mousePosition.Radius > 1.0 {
+			//fmt.Println("Mouse position outside dartboard, ignoring")
+			return
+		}
+		circleRadiusPixels := boardgeo.PixelDistanceBetweenBoardPositions(
+			u.dartboard.GetTracingCircleCenter(),
+			mousePosition)
+		u.dartboard.SetTracingCircleRadius(circleRadiusPixels)
+		//fmt.Printf("  Continue drawing circle center %v, mouse %v, radius %d\n",
+		//	u.dartboard.GetTracingCircleCenter(), mousePosition, circleRadiusPixels)
+		return
+	}
+
+	//  3. Drawing mode and mouse is released:  handled during click callback
+	//if u.circleDrawingState == drawCircleStateDrawing && !g.IsMouseDown(g.MouseButtonLeft) {
+	//	circleRadiusPixels := boardgeo.PixelDistanceBetweenBoardPositions(u.dartboard.GetTracingCircleCenter(), mousePosition)
+	//	fmt.Printf("  Stop drawing circle, record result center %v, radius %d\n",
+	//		u.dartboard.GetTracingCircleCenter(), circleRadiusPixels)
+	//	u.circleDrawingState = drawCircleStateOff
+	//	return
+	//}
+
+	// Getting her means we are in "start" mode but the user hasn't clicked the mouse yet.
+	//	Verify that
+	if u.circleDrawingState == drawCircleStateStart && !g.IsMouseDown(g.MouseButtonLeft) {
+		//fmt.Println("  Mouse not clicked yet")
+		return
+	}
+
+	panic("Invalid state for circle drawing")
+
 }
 
 // setupWindow sets up the window for the user interface
@@ -126,16 +198,16 @@ func (u *UserInterfaceInstance) setUpWindow() *g.WindowWidget {
 	// There is a left toolbar with buttons and messages, and the dartboard occupies a square
 	// in the remaining window to the right of this
 
-	squareDimension := math.Min(float64(dartboardWidth), windowHeight)
+	u.squareDimension = math.Min(float64(dartboardWidth), windowHeight)
 	//fmt.Printf("Window position = (%g,%g), size = (%g,%g). Square image is %g x %g\n",
 	//	windowX, windowY,
 	//	windowWidth, windowHeight,
 	//	squareDimension, squareDimension)
-	dartboardImageMin := image.Pt(int(windowX)+leftToolbarWidth, int(windowY))
-	dartboardImageMax := image.Pt(dartboardImageMin.X+int(squareDimension), dartboardImageMin.Y+int(squareDimension))
+	u.dartboardImageMin = image.Pt(int(windowX)+leftToolbarWidth, int(windowY))
+	u.dartboardImageMax = image.Pt(u.dartboardImageMin.X+int(u.squareDimension), u.dartboardImageMin.Y+int(u.squareDimension))
 	//fmt.Printf("image min %d, max %d\n", imageMin, imageMax)
 
-	u.dartboard.SetInfo(window, u.dartboardTexture, squareDimension, dartboardImageMin, dartboardImageMax)
+	u.dartboard.SetInfo(window, u.dartboardTexture, u.squareDimension, u.dartboardImageMin, u.dartboardImageMax)
 	return window
 }
 
@@ -166,6 +238,14 @@ func (u *UserInterfaceInstance) uiLayoutInteractionModePanel() g.Widget {
 			u.mode = Mode_Exact
 			u.accuracyModel = u.getAccuracyModel(u.mode)
 			u.radioChanged()
+		}),
+		g.RadioButton("Draw 95% Circle", u.mode == Mode_DrawCircle).OnChange(func() {
+			u.mode = Mode_DrawCircle
+			u.accuracyModel = u.getAccuracyModel(u.mode)
+			u.radioChanged()
+			u.messageDisplay = "Draw 95% Circle"
+			// Record circle drawing state last because radioChanged resets it
+			u.circleDrawingState = drawCircleStateStart
 		}),
 		// The following two radio buttons were used in early development stages, but are deprecated
 		// The code to implement them is still present, so you can un-comment them to resume their function
@@ -199,7 +279,7 @@ func (u *UserInterfaceInstance) uiLayoutInteractionModePanel() g.Widget {
 		g.Label(""),
 		g.Button("Reset").OnClick(u.radioChanged),
 	}
-	const numRadioButtons = 4
+	const numRadioButtons = 5
 	const numButtons = 1
 	const numLabels = 3
 	const numCheckboxes = 1
@@ -212,7 +292,8 @@ func (u *UserInterfaceInstance) uiLayoutInteractionModePanel() g.Widget {
 					numRadioButtons*uiRadioButtonHeight+
 						numButtons*uiButtonHeight+
 						numCheckboxes*uiCheckboxHeight+
-						numLabels*uiLabelHeight).
+						numLabels*uiLabelHeight+
+						2).
 				Layout(fieldsLayout),
 		)
 }
@@ -246,7 +327,6 @@ func (u *UserInterfaceInstance) uiLayoutNormalInfoPanel() g.Widget {
 			Label("StdDev 0-1").
 			Size(stdDevTextWidth).
 			OnChange(u.validateAndProcessStdDevField),
-		g.Button("Draw Std-Dev").OnClick(u.StartDrawStdDevMode),
 		g.Label(""),
 		g.Label("Show circles for:"),
 		g.Checkbox("1 Sigma", &u.drawOneSigma).OnChange(func() { u.dartboard.SetDrawOneSigma(u.drawOneSigma, u.accuracyModel.GetSigmaRadius(1)) }),
@@ -265,7 +345,6 @@ func (u *UserInterfaceInstance) uiLayoutNormalInfoPanel() g.Widget {
 					Size(LeftToolbarChildWidth,
 						numLabels*uiLabelHeight+
 							numCheckboxes*uiCheckboxHeight+
-							uiButtonHeight+
 							uiInputFieldHeight-20).
 					Layout(fieldsLayout),
 			),
@@ -447,6 +526,9 @@ func (u *UserInterfaceInstance) getAccuracyModel(mode InterfaceMode) simulation.
 		return simulation.NewNormalAccuracyModel(float64(u.stdDevInputField))
 	case Mode_SearchNormal:
 		return simulation.NewNormalAccuracyModel(float64(u.stdDevInputField))
+	case Mode_DrawCircle:
+		// Doesn't matter what model we return, as it isn't used in this mode
+		return simulation.NewNormalAccuracyModel(float64(u.stdDevInputField))
 	default:
 		panic("Invalid radio button value")
 		return simulation.NewPerfectAccuracyModel()
@@ -464,7 +546,7 @@ func (u *UserInterfaceInstance) radioChanged() {
 	u.dartboard.RemoveThrowMarkers()
 	u.searchComplete = false
 	u.searchingBlinkOn = false
-	u.circleDrawMode = circleDrawModeNone
+	u.circleDrawingState = drawCircleStateOff
 }
 
 // dartboardClickCallback is called when the user clicks on the dartboard. It is the mac-binary entry point for
@@ -490,15 +572,6 @@ func (u *UserInterfaceInstance) dartboardClickCallback(dartboard Dartboard, posi
 		u.messageDisplay = ""
 		u.scoreDisplay = ""
 		dartboard.RemoveThrowMarkers()
-		// If the board is clicked when we are in "start drawing std dev circle" mode, we
-		// will record this position as the centre and start tracking the diameter as the
-		// mouse is dragged.
-		if u.circleDrawMode == circleDrawModeStart {
-			u.circleDrawMode = circleDrawModeTrack
-			u.circleDrawCentre = position
-			fmt.Println("Beginning circle tracking at centre", position)
-			return
-		}
 
 		//	If it wasn't "start drawing circle" mode, we just take this as a throw marker
 		switch u.mode {
@@ -517,6 +590,34 @@ func (u *UserInterfaceInstance) dartboardClickCallback(dartboard Dartboard, posi
 			u.multipleNormalThrows(dartboard, position, u.accuracyModel)
 		case Mode_SearchNormal:
 			u.messageDisplay = "Click SEARCH to begin"
+		case Mode_DrawCircle:
+			//fmt.Println("Click callback for draw-circle ")
+			if u.circleDrawingState == drawCircleStateDrawing {
+				mousePosition := boardgeo.CreateBoardPositionFromXY(g.GetMousePos(), u.squareDimension,
+					u.dartboardImageMin)
+				circleRadiusPixels := boardgeo.PixelDistanceBetweenBoardPositions(u.dartboard.GetTracingCircleCenter(), mousePosition)
+				//fmt.Printf("  Stop drawing circle, record result center %v, radius %d\n",
+				//	u.dartboard.GetTracingCircleCenter(), circleRadiusPixels)
+				pixelDiameter := float64(2 * circleRadiusPixels)
+				//fmt.Printf("  Circle diameter is %g pixels\n", pixelDiameter)
+				//fmt.Printf("  Square dimension is %g pixels\n", u.squareDimension)
+				//fmt.Printf("  Scoring area fraction is %g\n", boardgeo.ScoringAreaFraction)
+				//normalizedDiameter := u.squareDimension / pixelDiameter * boardgeo.ScoringAreaFraction
+				normalizedDiameter := pixelDiameter / (u.squareDimension * boardgeo.ScoringAreaFraction)
+				//fmt.Println("Normalized diameter", normalizedDiameter)
+				stdDeviation := normalizedDiameter / 2
+				u.stdDevInputField = float32(stdDeviation)
+				u.accuracyModel.SetStandardDeviation(stdDeviation)
+				u.dartboard.SetDrawOneSigma(u.drawOneSigma, u.accuracyModel.GetSigmaRadius(1))
+				u.dartboard.SetDrawTwoSigma(u.drawTwoSigma, u.accuracyModel.GetSigmaRadius(2))
+				u.dartboard.SetDrawThreeSigma(u.drawThreeSigma, u.accuracyModel.GetSigmaRadius(3))
+				u.dartboard.StopTracingCircle()
+			}
+			// Since the radio button is still set for drawing, we reset the state to
+			// Start in case they click the button again - that would be repeating the draw
+			u.circleDrawingState = drawCircleStateStart
+			u.messageDisplay = ""
+			g.Update()
 		default:
 			panic("Invalid radio button value")
 		}
@@ -527,8 +628,8 @@ func (u *UserInterfaceInstance) dartboardClickCallback(dartboard Dartboard, posi
 // We set a flag causing the next mouse click to be used to draw a circle representing the
 // 2-standard deviation circle for the normal distribution
 func (u *UserInterfaceInstance) StartDrawStdDevMode() {
-	u.messageDisplay = "Click & drag 95% circle"
+	u.messageDisplay = "Draw 95% circle"
 	u.scoreDisplay = ""
-	u.circleDrawMode = circleDrawModeStart
+	u.circleDrawingState = drawCircleStateStart
 	g.Update()
 }

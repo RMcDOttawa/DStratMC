@@ -47,6 +47,10 @@ type Dartboard interface {
 	SetDrawTwoSigma(draw bool, radius float64)
 	SetDrawThreeSigma(draw bool, radius float64)
 	SetStdDeviationCirclesCentre(position boardgeo.BoardPosition)
+	StartTracingCircleAtCenter(position boardgeo.BoardPosition)
+	GetTracingCircleCenter() boardgeo.BoardPosition
+	SetTracingCircleRadius(radius int)
+	StopTracingCircle()
 }
 
 type DartboardInstance struct {
@@ -56,6 +60,10 @@ type DartboardInstance struct {
 	imageMin        image.Point
 	imageMax        image.Point
 	clickCallback   func(dartboard Dartboard, position boardgeo.BoardPosition)
+
+	//	Are we drawing a 95% accuracy circle?
+	//circleDrawingInProgress bool
+	//circleDrawingCentre     boardgeo.BoardPosition
 
 	// We have drawn a marker showing where a throw was targeted
 	targetDrawn    bool
@@ -90,17 +98,49 @@ type DartboardInstance struct {
 
 	drawThreeStdDeviation bool
 	drawThreeStdRadius    float64
+
+	//	We might be called upon to trace a circle while the mouse is down.
+	//  We'll be told the centre point of this circle, and then draw from there
+	//  to a given radius (in pixels).  This state is on when radius is non-zero
+	traceCircleDrawCentre boardgeo.BoardPosition
+	traceCircleDrawRadius int
 }
 
 // NewDartboard creates an instance of the dartboard object
 func NewDartboard() Dartboard {
 	instance := &DartboardInstance{
-		clickCallback:      nil,
-		targetDrawn:        false,
-		drawAccuracyCircle: false,
-		hitPositions:       make([]boardgeo.BoardPosition, 0, throwsAtOneTarget),
+		clickCallback:         nil,
+		targetDrawn:           false,
+		drawAccuracyCircle:    false,
+		hitPositions:          make([]boardgeo.BoardPosition, 0, throwsAtOneTarget),
+		traceCircleDrawRadius: 0,
 	}
 	return instance
+}
+
+func (d *DartboardInstance) StartTracingCircleAtCenter(position boardgeo.BoardPosition) {
+	// Record the centre of the "tracing the standard deviation circle" circle for drawing
+	// in subsequent times through the loop.  We'll only draw when the radius is set to
+	// a pixel value greater than zero, which will be on future passes.
+	//fmt.Println("StartTracingCircleAtCenter:", position)
+	d.traceCircleDrawCentre = position
+	d.traceCircleDrawRadius = 0
+	d.targetDrawn = true
+	d.targetPosition = position
+}
+
+func (d *DartboardInstance) SetTracingCircleRadius(radius int) {
+	//fmt.Println("SetTracingCircleRadius:", radius)
+	d.traceCircleDrawRadius = radius
+}
+
+func (d *DartboardInstance) StopTracingCircle() {
+	//fmt.Println("SetTracingCircleRadius:", radius)
+	d.traceCircleDrawRadius = 0
+}
+
+func (d *DartboardInstance) GetTracingCircleCenter() boardgeo.BoardPosition {
+	return d.traceCircleDrawCentre
 }
 
 // SetInfo accepts and stores key size and dimension info for the dartboard
@@ -229,6 +269,8 @@ func (d *DartboardInstance) DrawFunction() {
 	d.drawStdDeviationCircles(canvas)
 
 	d.drawQueuedHitMarkers()
+
+	d.drawStdDevCircleInProgress(canvas)
 }
 
 // drawReferenceLinesOnDartboard  draws a semitransparent circle and crosshair on the centre
@@ -327,6 +369,14 @@ func (d *DartboardInstance) drawQueuedAccuracyCircle(canvas *g.Canvas) {
 	accuracyCirclePosition := image.Pt(xCentre+d.imageMin.X, yCentre+d.imageMin.Y)
 	drawRadius := d.accuracyCircleRadius * d.squareDimension * boardgeo.ScoringAreaFraction / 2
 	canvas.AddCircle(accuracyCirclePosition, float32(drawRadius), accuracyCircleColour, 0, accuracyCircleThickness)
+}
+
+// drawStdDevCircleInProgress draws a circle from the stored centre with the stored radius (if > 0)
+func (d *DartboardInstance) drawStdDevCircleInProgress(canvas *g.Canvas) {
+	xCentre, yCentre := boardgeo.GetDrawingXY(d.traceCircleDrawCentre)
+	accuracyCirclePosition := image.Pt(xCentre+d.imageMin.X, yCentre+d.imageMin.Y)
+	canvas.AddCircle(accuracyCirclePosition,
+		float32(d.traceCircleDrawRadius), accuracyCircleColour, 0, accuracyCircleThickness)
 }
 
 // drawStdDeviationCircles draws the standard deviation circles that have been recorded

@@ -65,3 +65,11 @@ func DescribeBoardPoint(point BoardPosition) (BoardArea, int, string) {
 	asString := BoardAreaDescription[segment] + " " + strconv.Itoa(singlePointValue)
 	return segment, score, asString
 }
+
+func PixelDistanceBetweenBoardPositions(a BoardPosition, b BoardPosition) int {
+	xDiff := float64(a.XMouseInside - b.XMouseInside)
+	yDiff := float64(a.YMouseInside - b.YMouseInside)
+	distance := math.Sqrt(xDiff*xDiff + yDiff*yDiff)
+	return int(math.Round(distance))
+
+}
