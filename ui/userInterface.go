@@ -305,18 +305,19 @@ func (u *UserInterfaceInstance) uiLayoutMessagesPanel() g.Widget {
 		g.Label(u.scoreDisplay),
 	}
 	const numLabelsInsideChild = 2
-	return g.Layout{
-		// Blank line before
-		// Fields inside a bordered panel
-		g.Style().
-			SetColor(g.StyleColorBorder, panelBorderColour).
-			To(
-				g.Child().Border(true).
-					Size(LeftToolbarChildWidth,
-						numLabelsInsideChild*uiLabelHeight).
-					Layout(fieldsLayout),
-			),
-	}
+	return g.Condition(!(u.mode == Mode_SearchNormal || u.mode == Mode_MultiNormal),
+		g.Layout{
+			// Blank line before
+			// Fields inside a bordered panel
+			g.Style().
+				SetColor(g.StyleColorBorder, panelBorderColour).
+				To(
+					g.Child().Border(true).
+						Size(LeftToolbarChildWidth,
+							numLabelsInsideChild*uiLabelHeight).
+						Layout(fieldsLayout),
+				),
+		}, nil)
 }
 
 func (u *UserInterfaceInstance) uiLayoutNormalInfoPanel() g.Widget {
@@ -335,20 +336,21 @@ func (u *UserInterfaceInstance) uiLayoutNormalInfoPanel() g.Widget {
 	}
 	const numLabels = 4
 	const numCheckboxes = 3
-	return g.Layout{
-		g.Style().
-			// Fields inside a bordered panel
-			SetColor(g.StyleColorBorder, panelBorderColour).
-			SetDisabled(!(u.mode == Mode_OneNormal || u.mode == Mode_MultiNormal || u.mode == Mode_SearchNormal)).
-			To(
-				g.Child().Border(true).
-					Size(LeftToolbarChildWidth,
-						numLabels*uiLabelHeight+
-							numCheckboxes*uiCheckboxHeight+
-							uiInputFieldHeight-20).
-					Layout(fieldsLayout),
-			),
-	}
+	return g.Condition(u.mode != Mode_Exact,
+		g.Layout{
+			g.Style().
+				// Fields inside a bordered panel
+				SetColor(g.StyleColorBorder, panelBorderColour).
+				SetDisabled(!(u.mode == Mode_OneNormal || u.mode == Mode_MultiNormal || u.mode == Mode_SearchNormal)).
+				To(
+					g.Child().Border(true).
+						Size(LeftToolbarChildWidth,
+							numLabels*uiLabelHeight+
+								numCheckboxes*uiCheckboxHeight+
+								uiInputFieldHeight-20).
+						Layout(fieldsLayout),
+				),
+		}, nil)
 }
 
 func (u *UserInterfaceInstance) uiSearchControlsPanel() g.Widget {
@@ -374,52 +376,23 @@ func (u *UserInterfaceInstance) uiSearchControlsPanel() g.Widget {
 	const numLabels = 4
 	const numCheckboxes = 1
 	const numButtons = 1
-	return g.Layout{
-		g.Style().
-			// Fields inside a bordered panel
-			SetColor(g.StyleColorBorder, panelBorderColour).
-			SetDisabled(u.mode != Mode_SearchNormal).
-			To(
-				g.Child().Border(true).
-					Size(LeftToolbarChildWidth,
-						numLabels*uiLabelHeight+
-							uiProgressBarHeight+
-							numButtons*uiButtonHeight+
-							numCheckboxes*uiCheckboxHeight+12).
-					Layout(fieldsLayout),
-			),
-	}
+	return g.Condition(u.mode == Mode_SearchNormal,
+		g.Layout{
+			g.Style().
+				// Fields inside a bordered panel
+				SetColor(g.StyleColorBorder, panelBorderColour).
+				SetDisabled(u.mode != Mode_SearchNormal).
+				To(
+					g.Child().Border(true).
+						Size(LeftToolbarChildWidth,
+							numLabels*uiLabelHeight+
+								uiProgressBarHeight+
+								numButtons*uiButtonHeight+
+								numCheckboxes*uiCheckboxHeight+12).
+						Layout(fieldsLayout),
+				),
+		}, nil)
 }
-
-// uiLayoutStdCircleCheckboxes will, when we are doing normal distribution (and only then) offer 3 checkboxes for drawing reference
-// circles at 1, 2, and 3 standard deviations
-//func (u *UserInterfaceInstance) uiLayoutStdCircleCheckboxes() g.Widget {
-//	return g.Layout{
-//		g.Condition(u.mode == Mode_OneNormal || u.mode == Mode_MultiNormal || u.mode == Mode_SearchNormal,
-//			g.Layout{
-//				g.Label(""),
-//				g.Label("Show circles for:"),
-//				g.Checkbox("1 Sigma", &u.drawOneSigma).OnChange(func() { u.dartboard.SetDrawOneSigma(u.drawOneSigma, u.accuracyModel.GetSigmaRadius(1)) }),
-//				g.Checkbox("2 Sigma", &u.drawTwoSigma).OnChange(func() { u.dartboard.SetDrawTwoSigma(u.drawTwoSigma, u.accuracyModel.GetSigmaRadius(2)) }),
-//				g.Checkbox("3 Sigma", &u.drawThreeSigma).OnChange(func() { u.dartboard.SetDrawThreeSigma(u.drawThreeSigma, u.accuracyModel.GetSigmaRadius(3)) }),
-//			}, nil),
-//	}
-//}
-
-// uiLayoutStdDevField displays a field to enter an floating point number for standard deviation
-//func (u *UserInterfaceInstance) uiLayoutStdDevField() g.Widget {
-//	return g.Layout{
-//		// If we are doing multiple throws, allow the user to set the number of throws
-//		g.Condition(u.mode == Mode_OneNormal || u.mode == Mode_MultiNormal || u.mode == Mode_SearchNormal,
-//			g.Layout{
-//				g.Label(""),
-//				g.InputFloat(&u.stdDevInputField).
-//					Label("StdDev 0-1").
-//					Size(stdDevTextWidth).
-//					OnChange(u.validateAndProcessStdDevField),
-//			}, nil),
-//	}
-//}
 
 func (u *UserInterfaceInstance) validateAndProcessStdDevField() {
 	if u.stdDevInputField < .00001 {
@@ -447,22 +420,23 @@ func (u *UserInterfaceInstance) uiLayoutNumberOfThrowsPanel() g.Widget {
 		// Fields inside a bordered panel
 		g.InputInt(&u.numThrowsField).Label("Throws").
 			Size(numThrowsTextWidth).
-			StepSize(1).
-			StepSizeFast(100).
+			StepSize(100).
+			StepSizeFast(1000).
 			OnChange(u.validateNumThrowsField),
 	}
-	return g.Layout{
-		g.Style().
-			// Fields inside a bordered panel
-			SetColor(g.StyleColorBorder, panelBorderColour).
-			SetDisabled(!(u.mode == Mode_MultiNormal || u.mode == Mode_SearchNormal)).
-			To(
-				g.Child().Border(true).
-					Size(LeftToolbarChildWidth,
-						uiInputFieldHeight).
-					Layout(fieldsLayout),
-			),
-	}
+	return g.Condition(u.mode == Mode_MultiNormal || u.mode == Mode_SearchNormal,
+		g.Layout{
+			g.Style().
+				// Fields inside a bordered panel
+				SetColor(g.StyleColorBorder, panelBorderColour).
+				SetDisabled(!(u.mode == Mode_MultiNormal || u.mode == Mode_SearchNormal)).
+				To(
+					g.Child().Border(true).
+						Size(LeftToolbarChildWidth,
+							uiInputFieldHeight).
+						Layout(fieldsLayout),
+				),
+		}, nil)
 }
 
 func (u *UserInterfaceInstance) validateNumThrowsField() {
