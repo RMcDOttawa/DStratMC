@@ -12,6 +12,7 @@ import (
 	g "github.com/AllenDang/giu"
 	"image"
 	"image/color"
+	"math"
 )
 
 // Attributes of various annotations that may be drawn on top of the dartboard
@@ -29,8 +30,7 @@ var accuracyCircleColour = color.RGBA{R: 100, G: 100, B: 255, A: 192}
 // of the variables associated with it
 type Dartboard interface {
 	SetInfo(windowWidget *g.WindowWidget, texture *g.Texture,
-		squareDimension float64,
-		imageMin image.Point, imageMax image.Point)
+		imageMin image.Point, imageMax image.Point, leftToolbarWidth int)
 	SetClickCallback(callback func(dartboard Dartboard, position boardgeo.BoardPosition))
 	DrawFunction()
 	dartboardClicked()
@@ -54,12 +54,13 @@ type Dartboard interface {
 }
 
 type DartboardInstance struct {
-	window          *g.WindowWidget
-	texture         *g.Texture
-	squareDimension float64
-	imageMin        image.Point
-	imageMax        image.Point
-	clickCallback   func(dartboard Dartboard, position boardgeo.BoardPosition)
+	window  *g.WindowWidget
+	texture *g.Texture
+	//squareDimension float64
+	leftToolbarWidth int
+	imageMin         image.Point
+	imageMax         image.Point
+	clickCallback    func(dartboard Dartboard, position boardgeo.BoardPosition)
 
 	//	Are we drawing a 95% accuracy circle?
 	//circleDrawingInProgress bool
@@ -144,12 +145,13 @@ func (d *DartboardInstance) GetTracingCircleCenter() boardgeo.BoardPosition {
 }
 
 // SetInfo accepts and stores key size and dimension info for the dartboard
-func (d *DartboardInstance) SetInfo(windowWidget *g.WindowWidget, texture *g.Texture, squareDimension float64, imageMin image.Point, imageMax image.Point) {
+func (d *DartboardInstance) SetInfo(windowWidget *g.WindowWidget, texture *g.Texture,
+	imageMin image.Point, imageMax image.Point, leftToolbarWidth int) {
 	d.window = windowWidget
 	d.texture = texture
-	d.squareDimension = squareDimension
 	d.imageMin = imageMin
 	d.imageMax = imageMax
+	d.leftToolbarWidth = leftToolbarWidth
 }
 
 // SetClickCallback sets the function that is called back when the mouse is clicked inside the dartboard scoring area
@@ -196,7 +198,21 @@ func (d *DartboardInstance) SetDrawRefLines(checkbox bool) {
 
 // GetSquareDimension retrieves the square dimension, in pixels, of the square subframe containing the board
 func (d *DartboardInstance) GetSquareDimension() float64 {
-	return d.squareDimension
+	w32, h32 := d.window.CurrentSize()
+	if w32 == 0 || h32 == 0 {
+		return 0
+	}
+	windowWidth := float64(w32)
+	windowHeight := float64(h32)
+	leftToolbarWidth := int(math.Max(windowWidth-windowHeight, float64(d.leftToolbarWidth)))
+	dartboardWidth := int(windowWidth) - leftToolbarWidth
+	//fmt.Printf("Window size: %dx%d\n", int(width), int(height))
+
+	// There is a left toolbar with buttons and messages, and the dartboard occupies a square
+	// in the remaining window to the right of this
+
+	squareDimension := math.Min(float64(dartboardWidth), windowHeight)
+	return squareDimension
 }
 
 // GetImageMinPoint returns the x,y point of the origin of the dartboard square in the containing window
@@ -207,7 +223,7 @@ func (d *DartboardInstance) GetImageMinPoint() image.Point {
 //		GetScoringRadiusPixels returns the radius, in pixels, of the largest circle on the dartboard that is
 //	 in the scoring area (i.e. inside the outer radius of the Double ring)
 func (d *DartboardInstance) GetScoringRadiusPixels() float64 {
-	radius := d.squareDimension * boardgeo.ScoringAreaFraction / 2
+	radius := d.GetSquareDimension() * boardgeo.ScoringAreaFraction / 2
 	return radius
 }
 
@@ -231,7 +247,7 @@ func (d *DartboardInstance) RemoveThrowMarkers() {
 func (d *DartboardInstance) DrawFunction() {
 	//	The way GIU works, this function can be called before we are ready to draw something meaningful.
 	//	We detect this with squareDimension == 0 or positon coordinates == 0 and return
-	if d.squareDimension == 0 {
+	if d.GetSquareDimension() == 0 {
 		//fmt.Println("Square dimension 0, returning")
 		return
 	}
@@ -246,7 +262,8 @@ func (d *DartboardInstance) DrawFunction() {
 	//	Remember and then restore drawing cursor so image comes out on top of this
 	savedCsp := g.GetCursorScreenPos()
 	g.SetCursorScreenPos(d.imageMin)
-	g.InvisibleButton().Size(float32(d.squareDimension), float32(d.squareDimension)).
+	sqd := float32(d.GetSquareDimension())
+	g.InvisibleButton().Size(sqd, sqd).
 		OnClick(d.dartboardClicked).
 		Build()
 	g.SetCursorScreenPos(savedCsp)
@@ -271,6 +288,9 @@ func (d *DartboardInstance) DrawFunction() {
 	d.drawQueuedHitMarkers()
 
 	d.drawStdDevCircleInProgress(canvas)
+
+	// Force UI to see the panel extending to this point (in case SetPosition confused it)
+	g.Dummy(0, 0)
 }
 
 // drawReferenceLinesOnDartboard  draws a semitransparent circle and crosshair on the centre
@@ -280,20 +300,21 @@ func (d *DartboardInstance) drawReferenceLinesOnDartboard(canvas *g.Canvas) {
 	yCentre := (d.imageMin.Y + d.imageMax.Y) / 2
 
 	//	Early in development cycle, we included a reference circle
-	//testCirclePosition := image.Pt(xCentre, yCentre)
-	//testCircleColour := color.RGBA{R: 0, G: 0, B: 255, A: 128}
-	//radius := float32(d.squareDimension / 8.0)
-	//canvas.AddCircle(testCirclePosition, radius, testCircleColour, 0, 1)
+	testCirclePosition := image.Pt(xCentre, yCentre)
+	testCircleColour := color.RGBA{R: 0, G: 0, B: 255, A: 128}
+	radius := float32(d.GetSquareDimension() / 8.0)
+	canvas.AddCircle(testCirclePosition, radius, testCircleColour, 0, 1)
 
 	//	And add centred vertical and horizontal lines to help calibrate angle measurement
 	crossHairColour := color.RGBA{R: 150, G: 150, B: 150, A: 255}
 
-	verticalFrom := image.Pt(xCentre, yCentre-int(d.squareDimension/2))
-	verticalTo := image.Pt(xCentre, yCentre+int(d.squareDimension/2))
+	sqd := d.GetSquareDimension()
+	verticalFrom := image.Pt(xCentre, yCentre-int(sqd/2))
+	verticalTo := image.Pt(xCentre, yCentre+int(sqd/2))
 	canvas.AddLine(verticalFrom, verticalTo, crossHairColour, 1)
 
-	horizontalFrom := image.Pt(xCentre-int(d.squareDimension/2), yCentre)
-	horizontalTo := image.Pt(xCentre+int(d.squareDimension/2), yCentre)
+	horizontalFrom := image.Pt(xCentre-int(sqd/2), yCentre)
+	horizontalTo := image.Pt(xCentre+int(sqd/2), yCentre)
 	canvas.AddLine(horizontalFrom, horizontalTo, crossHairColour, 1)
 }
 
@@ -304,7 +325,7 @@ func (d *DartboardInstance) dartboardClicked() {
 	if d.clickCallback == nil {
 		panic("  No callback function")
 	} else {
-		position := boardgeo.CreateBoardPositionFromXY(g.GetMousePos(), d.squareDimension,
+		position := boardgeo.CreateBoardPositionFromXY(g.GetMousePos(), d.GetSquareDimension(),
 			d.imageMin)
 		d.clickCallback(d, position)
 	}
@@ -321,7 +342,7 @@ func (d *DartboardInstance) QueueTargetMarker(position boardgeo.BoardPosition) {
 func (d *DartboardInstance) DrawQueuedTargetMarker(canvas *g.Canvas) {
 
 	//	Get the pixel coordinates of this point
-	xCentre, yCentre := boardgeo.GetDrawingXY(d.targetPosition)
+	xCentre, yCentre := boardgeo.GetXY(d.targetPosition, d.GetSquareDimension())
 	xCentre += d.imageMin.X
 	yCentre += d.imageMin.Y
 
@@ -365,15 +386,15 @@ func (d *DartboardInstance) QueueAccuracyCircle(position boardgeo.BoardPosition,
 
 // drawStdDeviationCircles draws the standard deviation circles that have been recorded
 func (d *DartboardInstance) drawQueuedAccuracyCircle(canvas *g.Canvas) {
-	xCentre, yCentre := boardgeo.GetDrawingXY(d.accuracyCirclePosition)
+	xCentre, yCentre := boardgeo.GetXY(d.accuracyCirclePosition, d.GetSquareDimension())
 	accuracyCirclePosition := image.Pt(xCentre+d.imageMin.X, yCentre+d.imageMin.Y)
-	drawRadius := d.accuracyCircleRadius * d.squareDimension * boardgeo.ScoringAreaFraction / 2
+	drawRadius := d.accuracyCircleRadius * d.GetSquareDimension() * boardgeo.ScoringAreaFraction / 2
 	canvas.AddCircle(accuracyCirclePosition, float32(drawRadius), accuracyCircleColour, 0, accuracyCircleThickness)
 }
 
 // drawStdDevCircleInProgress draws a circle from the stored centre with the stored radius (if > 0)
 func (d *DartboardInstance) drawStdDevCircleInProgress(canvas *g.Canvas) {
-	xCentre, yCentre := boardgeo.GetDrawingXY(d.traceCircleDrawCentre)
+	xCentre, yCentre := boardgeo.GetXY(d.traceCircleDrawCentre, d.GetSquareDimension())
 	accuracyCirclePosition := image.Pt(xCentre+d.imageMin.X, yCentre+d.imageMin.Y)
 	canvas.AddCircle(accuracyCirclePosition,
 		float32(d.traceCircleDrawRadius), accuracyCircleColour, 0, accuracyCircleThickness)
@@ -401,9 +422,9 @@ func (d *DartboardInstance) drawStdDeviationCircles(canvas *g.Canvas) {
 //	multiplier and percentage of the normal distribution that it represents
 func (d *DartboardInstance) drawStdDeviationCircle(canvas *g.Canvas, multiplier float64, percentageString string, radius float64) {
 	// Draw the circle for this standard deviation reference
-	xCentre, yCentre := boardgeo.GetDrawingXY(d.stdDeviationCirclesCentre)
+	xCentre, yCentre := boardgeo.GetXY(d.stdDeviationCirclesCentre, d.GetSquareDimension())
 	circlePosition := image.Pt(xCentre+d.imageMin.X, yCentre+d.imageMin.Y)
-	drawRadius := radius * d.squareDimension * boardgeo.ScoringAreaFraction / 2
+	drawRadius := radius * d.GetSquareDimension() * boardgeo.ScoringAreaFraction / 2
 	canvas.AddCircle(circlePosition, float32(drawRadius), accuracyCircleColour, 0, accuracyCircleThickness)
 
 	//	Label the top of the circle with the multiplier
@@ -429,7 +450,7 @@ func (d *DartboardInstance) drawQueuedHitMarkers() {
 	// Loop through all the hit markers that are stored for display
 	for _, hit := range d.hitPositions {
 		// Get screen coordinates for this hit
-		xCentre, yCentre := boardgeo.GetDrawingXY(hit)
+		xCentre, yCentre := boardgeo.GetXY(hit, d.GetSquareDimension())
 		xCentre += d.imageMin.X
 		yCentre += d.imageMin.Y
 		//	Draw a tiny filled circle at this point

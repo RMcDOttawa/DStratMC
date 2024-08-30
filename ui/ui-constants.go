@@ -7,13 +7,14 @@ package ui
 type InterfaceMode int
 
 const (
-	Mode_Exact        InterfaceMode = iota // Just record exact hit where clicked
-	Mode_OneAvg                            // Record one hit uniformly distributed within a circle
-	Mode_MultiAvg                          // Record multiple hits uniformly distributed within a circle
-	Mode_OneNormal                         // Record one hit normally distributed within a circle
-	Mode_MultiNormal                       // Record multiple hits normally distributed within a circle
-	Mode_SearchNormal                      // Search around the board, recording result of multi-normal at each search location
-	Mode_DrawCircle                        // Draw the 2-sigma (95%) standard deviation circle
+	Mode_Exact          InterfaceMode = iota // Just record exact hit where clicked
+	Mode_OneAvg                              // Record one hit uniformly distributed within a circle
+	Mode_MultiAvg                            // Record multiple hits uniformly distributed within a circle
+	Mode_OneNormal                           // Record one hit normally distributed within a circle
+	Mode_MultiNormal                         // Record multiple hits normally distributed within a circle
+	Mode_SearchNormal                        // Search around the board, recording result of multi-normal at each search location
+	Mode_DrawCircle                          // Draw the 2-sigma (95%) standard deviation circle
+	Mode_EmpricalStdDev                      // Measure Std Dev by throwing real darts and recording results
 )
 
 // Certain fixed UI sizes that I can't be bothered to figure out how to compute at runtime
@@ -24,7 +25,7 @@ const multipleHitMarkerRadius = 1
 const numThrowsTextWidth = 120
 const stdDevTextWidth = 64.0
 
-const uiFramePadVertical = 2
+// const uiFramePadVertical = 2
 const uiRadioButtonHeight = 22
 const uiCheckboxHeight = uiRadioButtonHeight
 const uiLabelHeight = 26
@@ -44,5 +45,6 @@ const uniformCEPRadius = 0.3
 
 const MasterWindowWidth = 1000 + LeftToolbarMinimumWidth
 const MasterWindowHeight = 1000
+const BlankLineHeight = 8
 
 const testCoordinateConversion = true

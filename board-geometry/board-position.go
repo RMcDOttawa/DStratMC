@@ -15,10 +15,8 @@ import (
 //	The polar coordinate system has the origin at the centre of the board, with the radius normalized to 0-1
 //	and the angle in degrees, clockwise from the top of the board.
 type BoardPosition struct {
-	XMouseInside int
-	YMouseInside int
-	Radius       float64 // 0 (centre) to 1.0 (outer edge of scoring area) or larger for outside
-	Angle        float64 // Degrees, clockwise from 0 being straight up
+	Radius float64 // 0 (centre) to 1.0 (outer edge of scoring area) or larger for outside
+	Angle  float64 // Degrees, clockwise from 0 being straight up
 }
 
 // DescribeBoardPoint describes a point on the board by the area code, the score, and a text description
@@ -66,9 +64,11 @@ func DescribeBoardPoint(point BoardPosition) (BoardArea, int, string) {
 	return segment, score, asString
 }
 
-func PixelDistanceBetweenBoardPositions(a BoardPosition, b BoardPosition) int {
-	xDiff := float64(a.XMouseInside - b.XMouseInside)
-	yDiff := float64(a.YMouseInside - b.YMouseInside)
+func PixelDistanceBetweenBoardPositions(a BoardPosition, b BoardPosition, squareDimension float64) int {
+	aX, aY := GetXY(a, squareDimension)
+	bX, bY := GetXY(b, squareDimension)
+	xDiff := float64(aX - bX)
+	yDiff := float64(aY - bY)
 	distance := math.Sqrt(xDiff*xDiff + yDiff*yDiff)
 	return int(math.Round(distance))
 

@@ -36,8 +36,9 @@ func (p UniformAccuracyModel) GetThrow(target boardgeo.BoardPosition,
 	randomTheta := rand.Float64() * 2 * math.Pi
 	randomRadius := p.CEPRadius * math.Sqrt(rand.Float64()) * scoringRadius
 	//	Convert to cartesian
-	newX := float64(target.XMouseInside) + randomRadius*math.Cos(randomTheta)
-	newY := float64(target.YMouseInside) + randomRadius*math.Sin(randomTheta)
+	targetX, targetY := boardgeo.GetXY(target, squareDimension)
+	newX := float64(targetX) + randomRadius*math.Cos(randomTheta)
+	newY := float64(targetY) + randomRadius*math.Sin(randomTheta)
 	//	Convert to board position
 	point := image.Pt(int(math.Round(newX))+startPoint.X, int(math.Round(newY))+startPoint.Y)
 	result := boardgeo.CreateBoardPositionFromXY(point, squareDimension, startPoint)

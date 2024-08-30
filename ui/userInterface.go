@@ -20,12 +20,24 @@ type UserInterface interface {
 	MainUiLoop()
 }
 
+// Drawing the std-dev circle manually involves several modes the UI can be in
+
 type drawCircleState int
 
 const (
 	drawCircleStateOff drawCircleState = iota
 	drawCircleStateStart
 	drawCircleStateDrawing
+)
+
+// Calculating the std-dev by measuring real throws involves several modes the UI can be in
+
+type measureStdDevState int
+
+const (
+	measureStdDevStateOff measureStdDevState = iota
+	measureStdDevStateSelectTarget
+	measureStdDevStateThrowing
 )
 
 // UserInterfaceInstance is the attribute data stored with the UI object
@@ -62,9 +74,13 @@ type UserInterfaceInstance struct {
 
 	// Drawing circle to represent standard deviation
 	circleDrawingState drawCircleState
-	squareDimension    float64
 	dartboardImageMin  image.Point
 	dartboardImageMax  image.Point
+
+	//	Data structure collecting real throws to calculate standard deviation
+	realThrows       simulation.RealThrowCollection
+	measurementState measureStdDevState
+	measuringTarget  boardgeo.BoardPosition
 }
 
 var panelBorderColour = color.RGBA{100, 100, 100, 255}
@@ -85,6 +101,7 @@ func NewUserInterface(loadedImage *image.RGBA) UserInterface {
 		numThrowsField:             throwsAtOneTarget,
 		stdDevInputField:           0.15,
 		circleDrawingState:         drawCircleStateOff,
+		realThrows:                 simulation.NewRealThrowCollectionInstance(),
 	}
 	g.EnqueueNewTextureFromRgba(loadedImage, func(t *g.Texture) {
 		instance.dartboardTexture = t
@@ -123,7 +140,7 @@ func (u *UserInterfaceInstance) MainUiLoop() {
 //		If we have started "draw circle" mode, we will trace a circle on the dartboard as long
 //	 as the mouse button is down
 func (u *UserInterfaceInstance) handleDrawingCircle() {
-	mousePosition := boardgeo.CreateBoardPositionFromXY(g.GetMousePos(), u.squareDimension,
+	mousePosition := boardgeo.CreateBoardPositionFromXY(g.GetMousePos(), u.dartboard.GetSquareDimension(),
 		u.dartboardImageMin)
 
 	//fmt.Println("Handling circle drawing, state: ", u.circleDrawingState)
@@ -148,12 +165,12 @@ func (u *UserInterfaceInstance) handleDrawingCircle() {
 	//  2. Drawing mode and mouse is still down: keep drawing, stay in drawing mode
 	if u.circleDrawingState == drawCircleStateDrawing && g.IsMouseDown(g.MouseButtonLeft) {
 		if mousePosition.Radius > 1.0 {
-			//fmt.Println("Mouse position outside dartboard, ignoring")
+			fmt.Println("Mouse position outside dartboard, ignoring")
 			return
 		}
 		circleRadiusPixels := boardgeo.PixelDistanceBetweenBoardPositions(
 			u.dartboard.GetTracingCircleCenter(),
-			mousePosition)
+			mousePosition, u.dartboard.GetSquareDimension())
 		u.dartboard.SetTracingCircleRadius(circleRadiusPixels)
 		//fmt.Printf("  Continue drawing circle center %v, mouse %v, radius %d\n",
 		//	u.dartboard.GetTracingCircleCenter(), mousePosition, circleRadiusPixels)
@@ -176,7 +193,7 @@ func (u *UserInterfaceInstance) handleDrawingCircle() {
 		return
 	}
 
-	panic("Invalid state for circle drawing")
+	fmt.Println("Invalid state for circle drawing ignored. State: ", u.circleDrawingState)
 
 }
 
@@ -198,16 +215,16 @@ func (u *UserInterfaceInstance) setUpWindow() *g.WindowWidget {
 	// There is a left toolbar with buttons and messages, and the dartboard occupies a square
 	// in the remaining window to the right of this
 
-	u.squareDimension = math.Min(float64(dartboardWidth), windowHeight)
+	squareDimension := math.Min(float64(dartboardWidth), windowHeight)
 	//fmt.Printf("Window position = (%g,%g), size = (%g,%g). Square image is %g x %g\n",
 	//	windowX, windowY,
 	//	windowWidth, windowHeight,
 	//	squareDimension, squareDimension)
 	u.dartboardImageMin = image.Pt(int(windowX)+leftToolbarWidth, int(windowY))
-	u.dartboardImageMax = image.Pt(u.dartboardImageMin.X+int(u.squareDimension), u.dartboardImageMin.Y+int(u.squareDimension))
+	u.dartboardImageMax = image.Pt(u.dartboardImageMin.X+int(squareDimension), u.dartboardImageMin.Y+int(squareDimension))
 	//fmt.Printf("image min %d, max %d\n", imageMin, imageMax)
 
-	u.dartboard.SetInfo(window, u.dartboardTexture, u.squareDimension, u.dartboardImageMin, u.dartboardImageMax)
+	u.dartboard.SetInfo(window, u.dartboardTexture, u.dartboardImageMin, u.dartboardImageMax, leftToolbarWidth)
 	return window
 }
 
@@ -223,6 +240,7 @@ func (u *UserInterfaceInstance) leftToolbarLayout() g.Widget {
 		u.uiLayoutNumberOfThrowsPanel(),
 		u.uiLayoutNormalInfoPanel(),
 		u.uiSearchControlsPanel(),
+		u.uiRealThrowMeasurementControls(),
 
 		u.uiLayoutSearchResults(),
 		u.uiLayoutAverageScore(),
@@ -246,6 +264,13 @@ func (u *UserInterfaceInstance) uiLayoutInteractionModePanel() g.Widget {
 			u.messageDisplay = "Draw 95% Circle"
 			// Record circle drawing state last because radioChanged resets it
 			u.circleDrawingState = drawCircleStateStart
+		}),
+		g.RadioButton("Measure Real Throws", u.mode == Mode_EmpricalStdDev).OnChange(func() {
+			u.mode = Mode_EmpricalStdDev
+			u.measurementState = measureStdDevStateSelectTarget
+			u.accuracyModel = u.getAccuracyModel(u.mode)
+			u.radioChanged()
+			u.messageDisplay = "Select Target"
 		}),
 		// The following two radio buttons were used in early development stages, but are deprecated
 		// The code to implement them is still present, so you can un-comment them to resume their function
@@ -274,12 +299,12 @@ func (u *UserInterfaceInstance) uiLayoutInteractionModePanel() g.Widget {
 			u.accuracyModel = u.getAccuracyModel(u.mode)
 			u.radioChanged()
 		}),
-		g.Label(""),
+		g.Dummy(0, BlankLineHeight),
 		g.Checkbox("Reference Lines", &u.drawReferenceLinesCheckbox).OnChange(func() { u.dartboard.SetDrawRefLines(u.drawReferenceLinesCheckbox) }),
-		g.Label(""),
+		g.Dummy(0, BlankLineHeight),
 		g.Button("Reset").OnClick(u.radioChanged),
 	}
-	const numRadioButtons = 5
+	const numRadioButtons = 6
 	const numButtons = 1
 	const numLabels = 3
 	const numCheckboxes = 1
@@ -293,7 +318,7 @@ func (u *UserInterfaceInstance) uiLayoutInteractionModePanel() g.Widget {
 						numButtons*uiButtonHeight+
 						numCheckboxes*uiCheckboxHeight+
 						numLabels*uiLabelHeight+
-						2).
+						4).
 				Layout(fieldsLayout),
 		)
 }
@@ -323,12 +348,12 @@ func (u *UserInterfaceInstance) uiLayoutMessagesPanel() g.Widget {
 func (u *UserInterfaceInstance) uiLayoutNormalInfoPanel() g.Widget {
 	fieldsLayout := g.Layout{
 		g.Label("Normal Distribution"),
-		g.Label(""),
+		g.Dummy(0, BlankLineHeight),
 		g.InputFloat(&u.stdDevInputField).
 			Label("StdDev 0-1").
 			Size(stdDevTextWidth).
 			OnChange(u.validateAndProcessStdDevField),
-		g.Label(""),
+		g.Dummy(0, BlankLineHeight),
 		g.Label("Show circles for:"),
 		g.Checkbox("1 Sigma", &u.drawOneSigma).OnChange(func() { u.dartboard.SetDrawOneSigma(u.drawOneSigma, u.accuracyModel.GetSigmaRadius(1)) }),
 		g.Checkbox("2 Sigma", &u.drawTwoSigma).OnChange(func() { u.dartboard.SetDrawTwoSigma(u.drawTwoSigma, u.accuracyModel.GetSigmaRadius(2)) }),
@@ -336,7 +361,7 @@ func (u *UserInterfaceInstance) uiLayoutNormalInfoPanel() g.Widget {
 	}
 	const numLabels = 4
 	const numCheckboxes = 3
-	return g.Condition(u.mode != Mode_Exact,
+	return g.Condition(u.mode != Mode_Exact && u.mode != Mode_EmpricalStdDev,
 		g.Layout{
 			g.Style().
 				// Fields inside a bordered panel
@@ -356,9 +381,9 @@ func (u *UserInterfaceInstance) uiLayoutNormalInfoPanel() g.Widget {
 func (u *UserInterfaceInstance) uiSearchControlsPanel() g.Widget {
 	fieldsLayout := g.Layout{
 		g.Label("Search Controls"),
-		g.Label(""),
+		g.Dummy(0, BlankLineHeight),
 		g.Checkbox("Show Search", &u.searchShowEachTarget),
-		g.Label(""),
+		g.Dummy(0, BlankLineHeight),
 		g.Button("START SEARCH").OnClick(func() {
 			u.startSearchForBestThrow(u.accuracyModel, u.numThrowsField)
 		}),
@@ -371,7 +396,7 @@ func (u *UserInterfaceInstance) uiSearchControlsPanel() g.Widget {
 			g.CSSTag("waitlabel").To(
 				g.Label("Searching, please wait"),
 			),
-			g.Label("")),
+			g.Dummy(0, BlankLineHeight)),
 	}
 	const numLabels = 4
 	const numCheckboxes = 1
@@ -392,6 +417,46 @@ func (u *UserInterfaceInstance) uiSearchControlsPanel() g.Widget {
 						Layout(fieldsLayout),
 				),
 		}, nil)
+}
+
+func (u *UserInterfaceInstance) uiRealThrowMeasurementControls() g.Widget {
+	fieldsLayout := g.Layout{
+		g.Dummy(0, BlankLineHeight),
+		g.Button("New Model").OnClick(func() {
+			fmt.Println("New Model")
+			u.realThrows = simulation.NewRealThrowCollectionInstance()
+			u.measurementState = measureStdDevStateSelectTarget
+			u.messageDisplay = "Click Target"
+		}),
+		g.Style().SetDisabled(u.measurementState != measureStdDevStateThrowing).To(
+			g.Button("New Target").OnClick(func() {
+				u.measurementState = measureStdDevStateSelectTarget
+				u.messageDisplay = "Click Target"
+			}),
+		),
+		g.Dummy(0, BlankLineHeight),
+		g.Label(fmt.Sprintf("Data Points: %d", u.realThrows.GetNumThrows())),
+		g.Label(fmt.Sprintf("Std Dev: %s", u.realThrows.GetStdDevString())),
+		g.Dummy(0, BlankLineHeight),
+		g.Button("Load").OnClick(func() { fmt.Println("Load STUB") }),
+		g.Style().SetDisabled(u.realThrows.GetNumThrows() == 0).To(
+			g.Button("Save").OnClick(func() { fmt.Println("Save STUB") }),
+		),
+		g.Dummy(0, BlankLineHeight),
+		g.Style().SetDisabled(!u.realThrows.IsStdDevAvailable()).To(
+			g.Button("Use StdDev").OnClick(func() {
+				//
+				//stdDev := u.realThrows.CalcStdDevOfThrows()
+				//u.stdDevInputField = float32(stdDev)
+				//u.accuracyModel.SetStandardDeviation(stdDev)
+				//u.dartboard.SetDrawOneSigma(u.drawOneSigma, u.accuracyModel.GetSigmaRadius(1))
+				//u.dartboard.SetDrawTwoSigma(u.drawTwoSigma, u.accuracyModel.GetSigmaRadius(2))
+				//u.dartboard.SetDrawThreeSigma(u.drawThreeSigma, u.accuracyModel.GetSigmaRadius(3))
+				//g.Update()
+			}),
+		),
+	}
+	return g.Condition(u.mode == Mode_EmpricalStdDev, fieldsLayout, nil)
 }
 
 func (u *UserInterfaceInstance) validateAndProcessStdDevField() {
@@ -453,7 +518,7 @@ func (u *UserInterfaceInstance) uiLayoutAverageScore() g.Widget {
 	return g.Layout{
 		g.Condition(u.throwCount > 0,
 			g.Layout{
-				g.Label(""),
+				g.Dummy(0, BlankLineHeight),
 				g.Label("Throws: " + strconv.Itoa(int(u.throwCount))),
 				g.Label("Total: " + strconv.Itoa(int(u.throwTotal))),
 				g.Label("Average: " + strconv.FormatFloat(u.throwAverage, 'f', 1, 64)),
@@ -503,6 +568,9 @@ func (u *UserInterfaceInstance) getAccuracyModel(mode InterfaceMode) simulation.
 	case Mode_DrawCircle:
 		// Doesn't matter what model we return, as it isn't used in this mode
 		return simulation.NewNormalAccuracyModel(float64(u.stdDevInputField))
+	case Mode_EmpricalStdDev:
+		// Doesn't matter what model we return, as it isn't used in this mode
+		return simulation.NewNormalAccuracyModel(float64(u.stdDevInputField))
 	default:
 		panic("Invalid radio button value")
 		return simulation.NewPerfectAccuracyModel()
@@ -528,21 +596,23 @@ func (u *UserInterfaceInstance) radioChanged() {
 func (u *UserInterfaceInstance) dartboardClickCallback(dartboard Dartboard, position boardgeo.BoardPosition) {
 	// This is a good place to verify that coordinate conversion is working
 	if testCoordinateConversion {
-		testConvertPolar := boardgeo.CreateBoardPositionFromPolar(position.Radius, position.Angle, dartboard.GetSquareDimension())
+		testConvertPolar := boardgeo.CreateBoardPositionFromPolar(position.Radius, position.Angle)
 		if position.Radius != testConvertPolar.Radius || position.Angle != testConvertPolar.Angle {
 			panic("Coordinate conversion failed: polar coordinates do not match")
 		}
-		xDelta := math.Abs(float64(position.XMouseInside) - float64(testConvertPolar.XMouseInside))
-		yDelta := math.Abs(float64(position.YMouseInside) - float64(testConvertPolar.YMouseInside))
+		posX, posY := boardgeo.GetXY(position, u.dartboard.GetSquareDimension())
+		convertX, convertY := boardgeo.GetXY(testConvertPolar, u.dartboard.GetSquareDimension())
+		xDelta := math.Abs(float64(posX) - float64(convertX))
+		yDelta := math.Abs(float64(posY) - float64(convertY))
 		if xDelta > 1 || yDelta > 1 {
 			details := fmt.Sprintf("x %d,%d  y %d,%d",
-				position.XMouseInside, testConvertPolar.XMouseInside,
-				position.YMouseInside, testConvertPolar.YMouseInside)
+				posX, convertX,
+				posY, convertY)
 			panic("Coordinate conversion failed: cartesian coordinates do not match: " + details)
 		}
 	}
 
-	if position.Radius <= 1.0 {
+	if position.Radius <= 1.0 || u.mode == Mode_DrawCircle {
 		u.messageDisplay = ""
 		u.scoreDisplay = ""
 		dartboard.RemoveThrowMarkers()
@@ -565,33 +635,38 @@ func (u *UserInterfaceInstance) dartboardClickCallback(dartboard Dartboard, posi
 		case Mode_SearchNormal:
 			u.messageDisplay = "Click SEARCH to begin"
 		case Mode_DrawCircle:
-			//fmt.Println("Click callback for draw-circle ")
+			fmt.Println("Click callback for draw-circle ")
 			if u.circleDrawingState == drawCircleStateDrawing {
-				mousePosition := boardgeo.CreateBoardPositionFromXY(g.GetMousePos(), u.squareDimension,
+				mousePosition := boardgeo.CreateBoardPositionFromXY(g.GetMousePos(), u.dartboard.GetSquareDimension(),
 					u.dartboardImageMin)
-				circleRadiusPixels := boardgeo.PixelDistanceBetweenBoardPositions(u.dartboard.GetTracingCircleCenter(), mousePosition)
-				//fmt.Printf("  Stop drawing circle, record result center %v, radius %d\n",
-				//	u.dartboard.GetTracingCircleCenter(), circleRadiusPixels)
-				pixelDiameter := float64(2 * circleRadiusPixels)
-				//fmt.Printf("  Circle diameter is %g pixels\n", pixelDiameter)
-				//fmt.Printf("  Square dimension is %g pixels\n", u.squareDimension)
-				//fmt.Printf("  Scoring area fraction is %g\n", boardgeo.ScoringAreaFraction)
-				//normalizedDiameter := u.squareDimension / pixelDiameter * boardgeo.ScoringAreaFraction
-				normalizedDiameter := pixelDiameter / (u.squareDimension * boardgeo.ScoringAreaFraction)
-				//fmt.Println("Normalized diameter", normalizedDiameter)
-				stdDeviation := normalizedDiameter / 2
-				u.stdDevInputField = float32(stdDeviation)
-				u.accuracyModel.SetStandardDeviation(stdDeviation)
-				u.dartboard.SetDrawOneSigma(u.drawOneSigma, u.accuracyModel.GetSigmaRadius(1))
-				u.dartboard.SetDrawTwoSigma(u.drawTwoSigma, u.accuracyModel.GetSigmaRadius(2))
-				u.dartboard.SetDrawThreeSigma(u.drawThreeSigma, u.accuracyModel.GetSigmaRadius(3))
-				u.dartboard.StopTracingCircle()
+				circleRadiusPixels := boardgeo.PixelDistanceBetweenBoardPositions(u.dartboard.GetTracingCircleCenter(),
+					mousePosition, u.dartboard.GetSquareDimension())
+				if circleRadiusPixels > 0 {
+					fmt.Printf("  Stop drawing circle, record result center %v, radius %d\n",
+						u.dartboard.GetTracingCircleCenter(), circleRadiusPixels)
+					pixelDiameter := float64(2 * circleRadiusPixels)
+					fmt.Printf("  Circle diameter is %g pixels\n", pixelDiameter)
+					fmt.Printf("  Square dimension is %g pixels\n", u.dartboard.GetSquareDimension())
+					fmt.Printf("  Scoring area fraction is %g\n", boardgeo.ScoringAreaFraction)
+
+					normalizedDiameter := pixelDiameter / (u.dartboard.GetSquareDimension() * boardgeo.ScoringAreaFraction)
+					fmt.Println("Normalized diameter", normalizedDiameter)
+					stdDeviation := normalizedDiameter / 2
+					u.stdDevInputField = float32(stdDeviation)
+					u.accuracyModel.SetStandardDeviation(stdDeviation)
+					u.dartboard.SetDrawOneSigma(u.drawOneSigma, u.accuracyModel.GetSigmaRadius(1))
+					u.dartboard.SetDrawTwoSigma(u.drawTwoSigma, u.accuracyModel.GetSigmaRadius(2))
+					u.dartboard.SetDrawThreeSigma(u.drawThreeSigma, u.accuracyModel.GetSigmaRadius(3))
+					u.dartboard.StopTracingCircle()
+				}
 			}
 			// Since the radio button is still set for drawing, we reset the state to
 			// Start in case they click the button again - that would be repeating the draw
 			u.circleDrawingState = drawCircleStateStart
 			u.messageDisplay = ""
 			g.Update()
+		case Mode_EmpricalStdDev:
+			u.handleEmpiricalModeClick(position)
 		default:
 			panic("Invalid radio button value")
 		}
@@ -606,4 +681,37 @@ func (u *UserInterfaceInstance) StartDrawStdDevMode() {
 	u.scoreDisplay = ""
 	u.circleDrawingState = drawCircleStateStart
 	g.Update()
+}
+
+//		handleEmpiricalModeClick is called when the user clicks on the dartboard in "Measure Real Throws" mode
+//	 What happens depends on the current state of the measurement process
+func (u *UserInterfaceInstance) handleEmpiricalModeClick(position boardgeo.BoardPosition) {
+	//fmt.Println("Handling empirical mode click at ", position)
+	//fmt.Println("  Measurement state is ", u.measurementState)
+	//	In "waiting for user to select target" state, when they click we record the target position
+	//  and enter "gathering hits for this target" state
+	switch u.measurementState {
+	case measureStdDevStateSelectTarget:
+		// We have just started a first, or new, target. The clicked position is where we will be throwing,
+		// so we record this target position and move to "collecting hits" mode
+		//fmt.Println("  Selecting target at ", position)
+		u.measuringTarget = position
+		u.measurementState = measureStdDevStateThrowing
+		u.messageDisplay = "Throw, click hits"
+		g.Update()
+	case measureStdDevStateThrowing:
+		//fmt.Println("  Throwing at target, hit at ", position)
+		u.realThrows.AddHit(u.measuringTarget, position)
+		if u.realThrows.IsStdDevAvailable() {
+			stdDev := u.realThrows.CalcStdDevOfThrows()
+			u.stdDevInputField = float32(stdDev)
+			u.accuracyModel.SetStandardDeviation(stdDev)
+			u.dartboard.SetDrawOneSigma(u.drawOneSigma, u.accuracyModel.GetSigmaRadius(1))
+			u.dartboard.SetDrawTwoSigma(u.drawTwoSigma, u.accuracyModel.GetSigmaRadius(2))
+			u.dartboard.SetDrawThreeSigma(u.drawThreeSigma, u.accuracyModel.GetSigmaRadius(3))
+		}
+		u.messageDisplay = "Throw, click hits"
+	default:
+		panic("  Invalid state for empirical mode click")
+	}
 }

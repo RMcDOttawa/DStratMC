@@ -31,8 +31,8 @@ type CircularTargetSupplierInstance struct {
 	imageMinPoint   image.Point
 }
 
-const radiusIncrement = 0.025
-const angleIncrement = 0.3
+const radiusIncrement = 0.03
+const angleIncrement = 0.5
 
 // NewTargetSupplier creates a new instance of CircularTargetSupplierInstance, with the given squareDimension
 func NewTargetSupplier(squareDimension float64, imageMinPoint image.Point) TargetSupplier {
@@ -63,8 +63,7 @@ func (t *CircularTargetSupplierInstance) HasNext() bool {
 // 1.  Increment the angle, so we are working our way around the circle at the current distance from centre
 // 2.  If we have gone all the way around, reset the angle to zero and increment the radius
 func (t *CircularTargetSupplierInstance) NextTarget() boardgeo.BoardPosition {
-	result := boardgeo.CreateBoardPositionFromPolar(t.nextRadius, t.nextAngle,
-		t.squareDimension)
+	result := boardgeo.CreateBoardPositionFromPolar(t.nextRadius, t.nextAngle)
 	//	Prepare for next results.  Rotate the angle.  At 360 degrees, reset angle to 0 and incrmenet radius
 	//	Special case: radius zero is the centre - rotating angle is meaningless, so skip directly to next radius
 	if t.nextRadius == 0.0 {

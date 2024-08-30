@@ -62,28 +62,19 @@ func CreateBoardPositionFromXY(mousePosition image.Point,
 	thetaAsDegrees := polarTheta * (180 / math.Pi)
 
 	position := BoardPosition{
-		XMouseInside: xMouseInside,
-		YMouseInside: yMouseInside,
-		Radius:       polarRadius,
-		Angle:        thetaAsDegrees,
+		//XMouseInside: xMouseInside,
+		//YMouseInside: yMouseInside,
+		Radius: polarRadius,
+		Angle:  thetaAsDegrees,
 	}
 
 	return position
 }
 
-func GetDrawingXY(position BoardPosition) (int, int) {
-	return position.XMouseInside, position.YMouseInside
-}
-
-// CreateBoardPositionFromPolar creates a BoardPosition object from polar coordinates.
-// This is used when generating throws from random normal distributions, since those calculations
-// are done in polar coordinates.
-func CreateBoardPositionFromPolar(polarRadius float64, thetaDegrees float64,
-	squareDimension float64) BoardPosition {
-
+func GetXY(bp BoardPosition, squareDimension float64) (int, int) {
 	//	Get the x,y equivalents
-	xFromPolar := polarRadius * math.Sin(thetaDegrees*math.Pi/180)
-	yFromPolar := polarRadius * math.Cos(thetaDegrees*math.Pi/180)
+	xFromPolar := bp.Radius * math.Sin(bp.Angle*math.Pi/180)
+	yFromPolar := bp.Radius * math.Cos(bp.Angle*math.Pi/180)
 
 	//	polarRadius, thetaDegrees, xFromPolar, yFromPolar)
 	xScaledByScoringFraction := xFromPolar * ScoringAreaFraction
@@ -95,11 +86,34 @@ func CreateBoardPositionFromPolar(polarRadius float64, thetaDegrees float64,
 	xInsideWindow := int(math.Round(xScaledToWindow + squareDimension/2))
 	yInsideWindow := int(math.Round(squareDimension/2 - yScaledToWindow))
 
+	return xInsideWindow, yInsideWindow
+
+}
+
+// CreateBoardPositionFromPolar creates a BoardPosition object from polar coordinates.
+// This is used when generating throws from random normal distributions, since those calculations
+// are done in polar coordinates.
+func CreateBoardPositionFromPolar(polarRadius float64, thetaDegrees float64) BoardPosition {
+
+	//	Get the x,y equivalents
+	//xFromPolar := polarRadius * math.Sin(thetaDegrees*math.Pi/180)
+	//yFromPolar := polarRadius * math.Cos(thetaDegrees*math.Pi/180)
+
+	//	polarRadius, thetaDegrees, xFromPolar, yFromPolar)
+	//xScaledByScoringFraction := xFromPolar * ScoringAreaFraction
+	//yScaledByScoringFraction := yFromPolar * ScoringAreaFraction
+
+	//xScaledToWindow := xScaledByScoringFraction * (squareDimension / 2)
+	//yScaledToWindow := yScaledByScoringFraction * (squareDimension / 2)
+
+	//xInsideWindow := int(math.Round(xScaledToWindow + squareDimension/2))
+	//yInsideWindow := int(math.Round(squareDimension/2 - yScaledToWindow))
+
 	position := BoardPosition{
-		XMouseInside: xInsideWindow,
-		YMouseInside: yInsideWindow,
-		Radius:       polarRadius,
-		Angle:        thetaDegrees,
+		//XMouseInside: xInsideWindow,
+		//YMouseInside: yInsideWindow,
+		Radius: polarRadius,
+		Angle:  thetaDegrees,
 	}
 	return position
 }

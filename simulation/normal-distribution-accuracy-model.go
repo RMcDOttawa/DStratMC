@@ -59,8 +59,9 @@ func (p *NormalAccuracyModel) GetThrow(target boardgeo.BoardPosition,
 	deltaY := randomYDeviation * scoringRadius
 
 	// Calculate the final coordinates in Cartesian form
-	xFinal := target.XMouseInside + int(math.Round(deltaX))
-	yFinal := target.YMouseInside + int(math.Round(deltaY))
+	targetX, targetY := boardgeo.GetXY(target, squareDimension)
+	xFinal := targetX + int(math.Round(deltaX))
+	yFinal := targetY + int(math.Round(deltaY))
 	point := image.Pt(xFinal+startPoint.X, yFinal+startPoint.Y)
 
 	result := boardgeo.CreateBoardPositionFromXY(point, squareDimension, startPoint)
