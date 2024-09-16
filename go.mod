@@ -3,8 +3,12 @@ module DStratMC
 go 1.22
 
 require (
+	github.com/AllenDang/giu v0.8.1
+	gonum.org/v1/gonum v0.15.0
+)
+
+require (
 	github.com/AllenDang/cimgui-go v0.0.0-20240424153022-294abe7370df // indirect
-	github.com/AllenDang/giu v0.8.1 // indirect
 	github.com/AllenDang/go-findfont v0.0.0-20200702051237-9f180485aeb8 // indirect
 	github.com/faiface/mainthread v0.0.0-20171120011319-8b78f0a41ae3 // indirect
 	github.com/mazznoer/csscolorparser v0.1.3 // indirect
@@ -16,6 +20,5 @@ require (
 	golang.org/x/exp v0.0.0-20231110203233-9a3e6036ecaa // indirect
 	golang.org/x/image v0.18.0 // indirect
 	golang.org/x/sys v0.14.0 // indirect
-	gonum.org/v1/gonum v0.15.0 // indirect
 	gopkg.in/eapache/queue.v1 v1.1.0 // indirect
 )

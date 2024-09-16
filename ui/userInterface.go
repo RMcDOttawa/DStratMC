@@ -2,15 +2,18 @@ package ui
 
 import (
 	boardgeo "DStratMC/board-geometry"
+	"DStratMC/dialog"
 	"DStratMC/simulation"
 	target_search "DStratMC/target-search"
 	"context"
 	_ "embed"
+	"errors"
 	"fmt"
 	g "github.com/AllenDang/giu"
 	"image"
 	"image/color"
 	"math"
+	"os"
 	"strconv"
 )
 
@@ -165,7 +168,7 @@ func (u *UserInterfaceInstance) handleDrawingCircle() {
 	//  2. Drawing mode and mouse is still down: keep drawing, stay in drawing mode
 	if u.circleDrawingState == drawCircleStateDrawing && g.IsMouseDown(g.MouseButtonLeft) {
 		if mousePosition.Radius > 1.0 {
-			fmt.Println("Mouse position outside dartboard, ignoring")
+			//fmt.Println("Mouse position outside dartboard, ignoring")
 			return
 		}
 		circleRadiusPixels := boardgeo.PixelDistanceBetweenBoardPositions(
@@ -192,8 +195,6 @@ func (u *UserInterfaceInstance) handleDrawingCircle() {
 		//fmt.Println("  Mouse not clicked yet")
 		return
 	}
-
-	fmt.Println("Invalid state for circle drawing ignored. State: ", u.circleDrawingState)
 
 }
 
@@ -438,22 +439,9 @@ func (u *UserInterfaceInstance) uiRealThrowMeasurementControls() g.Widget {
 		g.Label(fmt.Sprintf("Data Points: %d", u.realThrows.GetNumThrows())),
 		g.Label(fmt.Sprintf("Std Dev: %s", u.realThrows.GetStdDevString())),
 		g.Dummy(0, BlankLineHeight),
-		g.Button("Load").OnClick(func() { fmt.Println("Load STUB") }),
+		g.Button("Load").OnClick(u.loadRealThrowData),
 		g.Style().SetDisabled(u.realThrows.GetNumThrows() == 0).To(
-			g.Button("Save").OnClick(func() { fmt.Println("Save STUB") }),
-		),
-		g.Dummy(0, BlankLineHeight),
-		g.Style().SetDisabled(!u.realThrows.IsStdDevAvailable()).To(
-			g.Button("Use StdDev").OnClick(func() {
-				//
-				//stdDev := u.realThrows.CalcStdDevOfThrows()
-				//u.stdDevInputField = float32(stdDev)
-				//u.accuracyModel.SetStandardDeviation(stdDev)
-				//u.dartboard.SetDrawOneSigma(u.drawOneSigma, u.accuracyModel.GetSigmaRadius(1))
-				//u.dartboard.SetDrawTwoSigma(u.drawTwoSigma, u.accuracyModel.GetSigmaRadius(2))
-				//u.dartboard.SetDrawThreeSigma(u.drawThreeSigma, u.accuracyModel.GetSigmaRadius(3))
-				//g.Update()
-			}),
+			g.Button("Save").OnClick(u.saveRealThrowData),
 		),
 	}
 	return g.Condition(u.mode == Mode_EmpricalStdDev, fieldsLayout, nil)
@@ -471,10 +459,7 @@ func (u *UserInterfaceInstance) validateAndProcessStdDevField() {
 		return
 	}
 	u.messageDisplay = ""
-	u.accuracyModel.SetStandardDeviation(float64(u.stdDevInputField))
-	u.dartboard.SetDrawOneSigma(u.drawOneSigma, u.accuracyModel.GetSigmaRadius(1))
-	u.dartboard.SetDrawTwoSigma(u.drawTwoSigma, u.accuracyModel.GetSigmaRadius(2))
-	u.dartboard.SetDrawThreeSigma(u.drawThreeSigma, u.accuracyModel.GetSigmaRadius(3))
+	u.setStandardDeviation(float64(u.stdDevInputField))
 }
 
 // uiLayoutNumberOfThrowsField displays a field to enter an integer number of throws
@@ -635,28 +620,25 @@ func (u *UserInterfaceInstance) dartboardClickCallback(dartboard Dartboard, posi
 		case Mode_SearchNormal:
 			u.messageDisplay = "Click SEARCH to begin"
 		case Mode_DrawCircle:
-			fmt.Println("Click callback for draw-circle ")
+			//fmt.Println("Click callback for draw-circle ")
 			if u.circleDrawingState == drawCircleStateDrawing {
 				mousePosition := boardgeo.CreateBoardPositionFromXY(g.GetMousePos(), u.dartboard.GetSquareDimension(),
 					u.dartboardImageMin)
 				circleRadiusPixels := boardgeo.PixelDistanceBetweenBoardPositions(u.dartboard.GetTracingCircleCenter(),
 					mousePosition, u.dartboard.GetSquareDimension())
 				if circleRadiusPixels > 0 {
-					fmt.Printf("  Stop drawing circle, record result center %v, radius %d\n",
-						u.dartboard.GetTracingCircleCenter(), circleRadiusPixels)
+					//fmt.Printf("  Stop drawing circle, record result center %v, radius %d\n",
+					//	u.dartboard.GetTracingCircleCenter(), circleRadiusPixels)
 					pixelDiameter := float64(2 * circleRadiusPixels)
-					fmt.Printf("  Circle diameter is %g pixels\n", pixelDiameter)
-					fmt.Printf("  Square dimension is %g pixels\n", u.dartboard.GetSquareDimension())
-					fmt.Printf("  Scoring area fraction is %g\n", boardgeo.ScoringAreaFraction)
+					//fmt.Printf("  Circle diameter is %g pixels\n", pixelDiameter)
+					//fmt.Printf("  Square dimension is %g pixels\n", u.dartboard.GetSquareDimension())
+					//fmt.Printf("  Scoring area fraction is %g\n", boardgeo.ScoringAreaFraction)
 
 					normalizedDiameter := pixelDiameter / (u.dartboard.GetSquareDimension() * boardgeo.ScoringAreaFraction)
-					fmt.Println("Normalized diameter", normalizedDiameter)
+					//fmt.Println("Normalized diameter", normalizedDiameter)
 					stdDeviation := normalizedDiameter / 2
 					u.stdDevInputField = float32(stdDeviation)
-					u.accuracyModel.SetStandardDeviation(stdDeviation)
-					u.dartboard.SetDrawOneSigma(u.drawOneSigma, u.accuracyModel.GetSigmaRadius(1))
-					u.dartboard.SetDrawTwoSigma(u.drawTwoSigma, u.accuracyModel.GetSigmaRadius(2))
-					u.dartboard.SetDrawThreeSigma(u.drawThreeSigma, u.accuracyModel.GetSigmaRadius(3))
+					u.setStandardDeviation(stdDeviation)
 					u.dartboard.StopTracingCircle()
 				}
 			}
@@ -705,13 +687,79 @@ func (u *UserInterfaceInstance) handleEmpiricalModeClick(position boardgeo.Board
 		if u.realThrows.IsStdDevAvailable() {
 			stdDev := u.realThrows.CalcStdDevOfThrows()
 			u.stdDevInputField = float32(stdDev)
-			u.accuracyModel.SetStandardDeviation(stdDev)
-			u.dartboard.SetDrawOneSigma(u.drawOneSigma, u.accuracyModel.GetSigmaRadius(1))
-			u.dartboard.SetDrawTwoSigma(u.drawTwoSigma, u.accuracyModel.GetSigmaRadius(2))
-			u.dartboard.SetDrawThreeSigma(u.drawThreeSigma, u.accuracyModel.GetSigmaRadius(3))
+			u.setStandardDeviation(stdDev)
 		}
 		u.messageDisplay = "Throw, click hits"
 	default:
 		panic("  Invalid state for empirical mode click")
 	}
+}
+
+func (u *UserInterfaceInstance) setStandardDeviation(stdDev float64) {
+	u.accuracyModel.SetStandardDeviation(stdDev)
+	u.dartboard.SetDrawOneSigma(u.drawOneSigma, u.accuracyModel.GetSigmaRadius(1))
+	u.dartboard.SetDrawTwoSigma(u.drawTwoSigma, u.accuracyModel.GetSigmaRadius(2))
+	u.dartboard.SetDrawThreeSigma(u.drawThreeSigma, u.accuracyModel.GetSigmaRadius(3))
+}
+
+func (u *UserInterfaceInstance) loadRealThrowData() {
+	fmt.Println("Load ")
+	filePath, err := dialog.File().Load()
+	if errors.Is(err, dialog.ErrCancelled) {
+		return
+	}
+	if err != nil {
+		fmt.Println("Error selecting file to load: ", err)
+		return
+	}
+
+	file, err := os.Open(filePath)
+	if err != nil {
+		fmt.Println("unable to open file to read stored hits data:", err)
+		return
+	}
+	defer func(file *os.File) {
+		//fmt.Println("Closing data file after reading it")
+		_ = file.Close()
+	}(file)
+
+	//	Read file to string array, parse to separate lines
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		fmt.Println("unable to read exposure log:", err)
+		return
+	}
+
+	u.realThrows.LoadStoredJsonData(content)
+	stdev := u.realThrows.CalcStdDevOfThrows()
+	u.setStandardDeviation(stdev)
+	u.stdDevInputField = float32(stdev)
+}
+
+func (u *UserInterfaceInstance) saveRealThrowData() {
+	filePath, err := dialog.File().Save()
+	if err != nil {
+		fmt.Println("Error selecting file to save: ", err)
+		return
+	}
+	if filePath != "" {
+		jsonData := u.realThrows.GetJsonData()
+
+		// Write the json string to the file at the given path
+		file, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			fmt.Println("unable to open file to write hit data:", err)
+			return
+		}
+		defer func(file *os.File) {
+			_ = file.Close()
+		}(file)
+
+		_, err = file.Write([]byte(jsonData))
+		if err != nil {
+			fmt.Println("error writing hit information to file:", err)
+			return
+		}
+	}
+
 }

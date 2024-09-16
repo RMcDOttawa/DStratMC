@@ -1,6 +1,7 @@
 package boardgeo
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
 	"strconv"
@@ -17,6 +18,42 @@ import (
 type BoardPosition struct {
 	Radius float64 // 0 (centre) to 1.0 (outer edge of scoring area) or larger for outside
 	Angle  float64 // Degrees, clockwise from 0 being straight up
+}
+
+type marshallableStringVersion struct {
+	Radius string
+	Angle  string
+}
+
+func (bp *BoardPosition) MarshalText() ([]byte, error) {
+	marshallable := marshallableStringVersion{
+		Radius: strconv.FormatFloat(bp.Radius, 'g', -1, 64),
+		Angle:  strconv.FormatFloat(bp.Angle, 'g', -1, 64),
+	}
+	marshall, err := json.Marshal(marshallable)
+	return marshall, err
+}
+
+func (bp *BoardPosition) UnmarshalText(bytes []byte) error {
+	var umsv marshallableStringVersion
+	err := json.Unmarshal(bytes, &umsv)
+	if err != nil {
+		fmt.Printf("Error unmarshalling board position %s: %s", string(bytes), err)
+		return err
+	}
+	radius, err := strconv.ParseFloat(umsv.Radius, 64)
+	if err != nil {
+		fmt.Printf("Error parsing radius %s: %s", umsv.Radius, err)
+		return err
+	}
+	angle, err := strconv.ParseFloat(umsv.Angle, 64)
+	if err != nil {
+		fmt.Println("Error parsing angle %s: %s", umsv.Angle, err)
+		return err
+	}
+	bp.Radius = radius
+	bp.Angle = angle
+	return nil
 }
 
 // DescribeBoardPoint describes a point on the board by the area code, the score, and a text description

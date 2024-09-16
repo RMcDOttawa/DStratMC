@@ -2,6 +2,7 @@ package simulation
 
 import (
 	boardgeo "DStratMC/board-geometry"
+	"encoding/json"
 	"fmt"
 	"math"
 )
@@ -12,6 +13,8 @@ type RealThrowCollection interface {
 	GetStdDevString() string
 	IsStdDevAvailable() bool
 	CalcStdDevOfThrows() float64
+	GetJsonData() string
+	LoadStoredJsonData(content []byte)
 }
 
 //	A "real throw collection" is a collection of real throws that have been made by a player.
@@ -116,4 +119,27 @@ func (r *RealThrowCollectionInstance) CalcStdDevOfThrows() float64 {
 		return r.cachedStdDev
 	}
 	return r.cachedStdDev
+}
+
+// GetJsonData returns the data in the collection as a JSON stream, suitable for a file
+func (r *RealThrowCollectionInstance) GetJsonData() string {
+	// We just store the data, not the cache
+	jsonString, err := json.MarshalIndent(r.targetsList, "", "  ")
+	if err != nil {
+		fmt.Println("Error marshalling JSON", err)
+		return ""
+	}
+	return string(jsonString)
+}
+
+func (r *RealThrowCollectionInstance) LoadStoredJsonData(content []byte) {
+	//fmt.Println("LoadStoredJsonData. Loaded file content: ", string(content))
+	var decodedMap map[boardgeo.BoardPosition]hitsList
+	err := json.Unmarshal(content, &decodedMap)
+	if err != nil {
+		fmt.Println("Error unmarshalling JSON", err)
+		return
+	}
+	r.targetsList = decodedMap
+	r.dataChanged = true
 }

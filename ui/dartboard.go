@@ -363,9 +363,6 @@ func (d *DartboardInstance) DrawQueuedTargetMarker(canvas *g.Canvas) {
 	horizontalTo := image.Pt(xCentre+targetCrossLength/2, yCentre)
 	canvas.AddLine(horizontalFrom, horizontalTo, colour, targetCrossThickness)
 
-	//	Refactoring. I have no idea why the following line ended up in the code, and am 99.999% sure it
-	//	was an error. Commenting out for now, and will delete in a while when I'm sure.
-	//boardgeo.DescribeBoardPoint(d.targetPosition)
 }
 
 // Get RGB values for a colour that contrasts with the colour under the given board position

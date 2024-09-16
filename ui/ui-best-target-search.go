@@ -22,27 +22,33 @@ func (u *UserInterfaceInstance) startSearchForBestThrow(model simulation.Accurac
 	u.searchResultStrings = [10]string{"", "", "", "", "", "", "", "", "", ""}
 	u.dartboard.RemoveThrowMarkers()
 	u.searchComplete = false
-	g.Update()
+	timeBeforeSearch := time.Now()
 
+	g.Update()
 	//	Start a process to blink the "searching" label on and off
 	var blinkContext context.Context
 	blinkContext, u.cancelBlinkTimer = context.WithCancel(context.Background())
-	go u.cycleBlinkFlag(blinkContext)
+	go u.cycleBlinkFlag(blinkContext, func() {
+		timeAfterSearch := time.Now()
+		fmt.Printf("Search took %v\n", timeAfterSearch.Sub(timeBeforeSearch))
+	})
 
 	//	Start the actual search process
 	var searchContext context.Context
 	searchContext, u.cancelSearch = context.WithCancel(context.Background())
 	go u.searchProcess(searchContext, model, numThrows)
+
 }
 
 // cycleBlinkFlag is the sub-process that cycles the blinking message on and off
 // It is created with a context object to allow receiving a "cancel" message,
 // and runs indefinitely until that cancel is received.
-func (u *UserInterfaceInstance) cycleBlinkFlag(ctx context.Context) {
+func (u *UserInterfaceInstance) cycleBlinkFlag(ctx context.Context, doneCallback func()) {
 	for {
 		select {
 		case <-ctx.Done():
 			u.searchingBlinkOn = false
+			doneCallback()
 			return
 		default:
 			u.searchingBlinkOn = !u.searchingBlinkOn
@@ -95,7 +101,11 @@ func (u *UserInterfaceInstance) searchProcess(ctx context.Context, model simulat
 
 // loopThroughAllTargets uses the target supplier iterator to loop through every possible target, and throw
 // a large number of darts at each, recording the average score for each
-func (u *UserInterfaceInstance) loopThroughAllTargets(ctx context.Context, model simulation.AccuracyModel, numThrows int32, targetSupplier target_search.TargetSupplier, results target_search.SimResults) {
+func (u *UserInterfaceInstance) loopThroughAllTargets(ctx context.Context,
+	model simulation.AccuracyModel,
+	numThrows int32,
+	targetSupplier target_search.TargetSupplier,
+	results target_search.SimResults) {
 	u.searchProgressPercent = 0
 	// Loop through all targets
 	targetCount := float64(0)
