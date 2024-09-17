@@ -8,10 +8,16 @@ import (
 
 // SimResults stores the results of a simulation run - each target position tried, and its average score
 
+type TargetResult struct {
+	Position boardgeo.BoardPosition
+	Score    float64
+}
+
 type SimResults interface {
-	AddTargetResult(position boardgeo.BoardPosition, score float64)
+	AddTargetResult(result TargetResult)
 	GetResultsSortedByHighScore() []OneResult
 	GetResultsSlice() []OneResult
+	GetNumResults() uint32
 }
 
 // SimResultsInstance is data for the instance of the SimResults object
@@ -43,6 +49,10 @@ func (s SimResultsInstance) GetResultsSlice() []OneResult {
 	return slice
 }
 
+func (s SimResultsInstance) GetNumResults() uint32 {
+	return uint32(len(s.resultsMap))
+}
+
 // GetResultsSortedByHighScore returns the positions sorted from the highest average score to the lowest
 func (s SimResultsInstance) GetResultsSortedByHighScore() []OneResult {
 	// Convert map to slice
@@ -55,8 +65,8 @@ func (s SimResultsInstance) GetResultsSortedByHighScore() []OneResult {
 }
 
 // AddTargetResult adds a target position and its average score to the results list
-func (s SimResultsInstance) AddTargetResult(position boardgeo.BoardPosition, score float64) {
-	s.resultsMap[position] = score
+func (s SimResultsInstance) AddTargetResult(result TargetResult) {
+	s.resultsMap[result.Position] = result.Score
 }
 
 // FilterToOneTargetEach returns a slice of OneResult objects, with only one result for each target position
